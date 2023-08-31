@@ -17,7 +17,7 @@ from .customFields import GeneratedIdentityField
 import requests
 
 
-class BanRecords(models.Model):
+class BanRecord(models.Model):
     ban_id = GeneratedIdentityField(primary_key=True)
     username = models.CharField(max_length=37, null=False)
     user_id = models.BigIntegerField(null=False)
@@ -32,14 +32,14 @@ class BanRecords(models.Model):
 
     @classmethod
     @sync_to_async
-    def insert_records(cls, records: List[BanRecords]) -> None:
-        """Adds entry to BanRecords table"""
-        BanRecords.objects.bulk_create(records)
+    def insert_records(cls, records: List[BanRecord]) -> None:
+        """Adds entry to BanRecord table"""
+        BanRecord.objects.bulk_create(records)
 
     @classmethod
     @sync_to_async
-    def insert_record(cls, record: BanRecords) -> None:
-        """Adds entry to BanRecords table"""
+    def insert_record(cls, record: BanRecord) -> None:
+        """Adds entry to BanRecord table"""
         record.save()
 
     @classmethod
@@ -47,28 +47,28 @@ class BanRecords(models.Model):
     def get_all_active_ban_user_ids(cls) -> List[int]:
         """Returns list of user_ids for all currently banned users"""
 
-        return list(BanRecords.objects.values_list('user_id', flat=True).filter(unban_date=None))
+        return list(BanRecord.objects.values_list('user_id', flat=True).filter(unban_date=None))
 
     @classmethod
     @sync_to_async
-    def get_all_active_bans(cls) -> List[BanRecords]:
+    def get_all_active_bans(cls) -> List[BanRecord]:
         """Returns list of usernames and user_ids for all currently banned users"""
 
-        return list(BanRecords.objects.values('username', 'user_id').filter(unban_date=None))
+        return list(BanRecord.objects.values('username', 'user_id').filter(unban_date=None))
 
     @classmethod
     @sync_to_async
     def get_active_bans_count(cls) -> int:
         """Returns count of all the active bans"""
 
-        return BanRecords.objects.filter(unban_date=None).count()
+        return BanRecord.objects.filter(unban_date=None).count()
 
     @classmethod
     @sync_to_async
     def unban_by_id(cls, user_id: int) -> str:
         """Set active=False for user with the given user_id. This representes unbanning a user."""
         try:
-            user = BanRecords.objects.get(user_id=user_id, unban_date=None)
+            user = BanRecord.objects.get(user_id=user_id, unban_date=None)
         except Exception:
             return None
 
