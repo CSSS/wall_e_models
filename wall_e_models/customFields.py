@@ -1,8 +1,8 @@
 from django.db import models
 from django.conf import settings
 
-ENV = getattr(settings, "ENVIRONMENT", "PRODUCTION")
-POSTGRES_SQL = getattr(settings, "POSTGRES_SQL", True)
+ENV = getattr(settings, "ENVIRONMENT", "LOCALHOST")
+POSTGRES_SQL = getattr(settings, "POSTGRES_SQL", False)
 
 
 class GeneratedIdentityField(models.AutoField):

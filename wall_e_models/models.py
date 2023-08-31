@@ -269,8 +269,8 @@ class UserPoint(models.Model):
     def _message_counts_towards_points(self):
         return datetime.datetime.fromtimestamp(
             self.latest_time_xp_was_earned_epoch,
-            pytz.timezone(django_db_orm_settings.TIME_ZONE)
-        ) + datetime.timedelta(minutes=1) < datetime.datetime.now(tz=pytz.timezone(django_db_orm_settings.TIME_ZONE))
+            pytz.timezone(settings.TIME_ZONE)
+        ) + datetime.timedelta(minutes=1) < datetime.datetime.now(tz=pytz.timezone(settings.TIME_ZONE))
 
     @property
     def username(self):
