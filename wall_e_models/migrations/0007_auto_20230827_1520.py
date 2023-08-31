@@ -7,7 +7,7 @@ import django.utils.timezone
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('WalleModels', '0006_auto_20220909_1633'),
+        ('wall_e_models', '0006_auto_20220909_1633'),
     ]
 
     operations = [

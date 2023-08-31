@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('WalleModels', '0003_auto_20220204_2003'),
+        ('wall_e_models', '0003_auto_20220204_2003'),
     ]
 
     operations = [

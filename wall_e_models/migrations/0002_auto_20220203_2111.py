@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('WalleModels', '0001_initial'),
+        ('wall_e_models', '0001_initial'),
     ]
 
     operations = [
