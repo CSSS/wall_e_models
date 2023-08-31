@@ -1,5 +1,8 @@
 from django.db import models
-import django_db_orm_settings
+from django.conf import settings
+
+ENV = getattr(settings, "ENVIRONMENT", "PRODUCTION")
+POSTGRES_SQL = getattr(settings, "POSTGRES_SQL", True)
 
 
 class GeneratedIdentityField(models.AutoField):
@@ -15,7 +18,7 @@ class GeneratedIdentityField(models.AutoField):
         # you wind up with the error
         # DETAIL:  Column "ban_id" is an identity column defined as GENERATED ALWAYS.
         # HINT:  Use OVERRIDING SYSTEM VALUE to override.
-        self.always = django_db_orm_settings.environment == "PRODUCTION"
+        self.always = ENV == "PRODUCTION"
 
         super(GeneratedIdentityField, self).__init__(*args, **kwargs)
 
@@ -25,7 +28,7 @@ class GeneratedIdentityField(models.AutoField):
         return name, path, args, kwargs
 
     def db_type(self, connection):
-        if django_db_orm_settings.postgres_sql:
+        if POSTGRES_SQL:
             return f"INTEGER GENERATED {'ALWAYS' if self.always else 'BY DEFAULT'} AS IDENTITY"
         else:
             # migration 4 gives this error unless the db_type is just INTEGER

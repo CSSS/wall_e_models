@@ -14,7 +14,6 @@ from django.forms import model_to_dict
 from django.utils import timezone
 
 from .customFields import GeneratedIdentityField
-import django_db_orm_settings
 import requests
 
 
@@ -119,18 +118,12 @@ class CommandStat(models.Model):
         return [key for key in model_to_dict(CommandStat) if key != "epoch_time"]
 
     @classmethod
-    async def get_all_entries_async(cls):
-        return await sync_to_async(cls._get_all_entries, thread_sensitive=True)()
-
-    @classmethod
-    def _get_all_entries(cls):
+    @sync_to_async
+    def get_all_entries(cls):
         return list(CommandStat.objects.all())
 
     @classmethod
-    async def save_command_async(cls, command_stat):
-        await sync_to_async(cls._save_command_stat, thread_sensitive=True)(command_stat)
-
-    @classmethod
+    @sync_to_async
     def _save_command_stat(cls, command_stat):
         while True:
             try:
@@ -388,11 +381,8 @@ class Reminder(models.Model):
         return f"Reminder for user {self.author_id} on date {self.reminder_date_epoch} with message {self.message}"
 
     @classmethod
-    async def get_expired_reminders(cls):
-        return await sync_to_async(cls._sync_get_expired_reminders, thread_sensitive=True)()
-
-    @classmethod
-    def _sync_get_expired_reminders(cls):
+    @sync_to_async
+    def get_expired_reminders(cls):
         return list(
             Reminder.objects.all().filter(
                 reminder_date_epoch__lte=datetime.datetime.now(
@@ -402,59 +392,42 @@ class Reminder(models.Model):
         )
 
     @classmethod
-    async def get_reminder_by_id(cls, reminder_id):
+    @sync_to_async
+    def get_reminder_by_id(cls, reminder_id):
         if not f"{reminder_id}".isdigit():
             return None
-        return await sync_to_async(cls._sync_get_reminder_by_id, thread_sensitive=True)(reminder_id)
-
-    @classmethod
-    def _sync_get_reminder_by_id(cls, reminder_id):
         reminders = Reminder.objects.all().filter(id=reminder_id)
         if len(reminders) == 0:
             return None
         else:
             return reminders[0]
 
-    @classmethod
-    async def delete_reminder_by_id(cls, reminder_id):
-        await sync_to_async(cls._sync_delete_reminder_by_id, thread_sensitive=True)(reminder_id)
 
     @classmethod
-    def _sync_delete_reminder_by_id(cls, reminder_to_delete):
+    @sync_to_async
+    def delete_reminder_by_id(cls, reminder_to_delete):
         Reminder.objects.all().get(id=reminder_to_delete).delete()
 
     @classmethod
-    async def delete_reminder(cls, reminder):
-        await sync_to_async(cls._sync_delete_reminder, thread_sensitive=True)(reminder)
-
-    @classmethod
-    def _sync_delete_reminder(cls, reminder_to_delete):
+    @sync_to_async
+    def delete_reminder(cls, reminder_to_delete):
         reminder_to_delete.delete()
 
     @classmethod
-    async def get_reminder_by_author(cls, author_id):
-        return await sync_to_async(
-            cls._sync_get_reminder_by_author, thread_sensitive=True
-        )(author_id)
-
-    @classmethod
-    def _sync_get_reminder_by_author(cls, author_id):
+    @sync_to_async
+    def get_reminder_by_author(cls, author_id):
         return list(Reminder.objects.all().filter(author_id=author_id).order_by('reminder_date_epoch'))
 
-    @classmethod
-    async def get_all_reminders(cls):
-        return await sync_to_async(cls._sync_get_all_reminders, thread_sensitive=True)()
 
     @classmethod
-    def _sync_get_all_reminders(cls):
+    @sync_to_async
+    def get_all_reminders(cls):
         return list(Reminder.objects.all().order_by('reminder_date_epoch'))
 
-    @classmethod
-    async def save_reminder(cls, reminder_to_save):
-        await sync_to_async(cls._sync_save_reminder, thread_sensitive=True)(reminder_to_save)
 
     @classmethod
-    def _sync_save_reminder(cls, reminder_to_save):
+    @sync_to_async
+    def save_reminder(cls, reminder_to_save):
         reminder_to_save.save()
 
     def get_countdown(self):
