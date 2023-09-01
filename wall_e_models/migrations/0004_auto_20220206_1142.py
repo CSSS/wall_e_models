@@ -25,7 +25,7 @@ class Migration(migrations.Migration):
                 ('unban_date', models.BigIntegerField(default=None, null=True)),
             ],
             options={
-                'db_table': 'WalleModels_ban_records',
+                'db_table': 'wall_e_models_ban_records',
             },
         )
     ]

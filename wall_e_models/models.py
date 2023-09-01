@@ -28,7 +28,7 @@ class BanRecord(models.Model):
     unban_date = models.BigIntegerField(null=True, default=None)
 
     class Meta:
-        db_table = 'WalleModels_ban_records'
+        db_table = 'wall_e_models_ban_records'
 
     @classmethod
     @sync_to_async
@@ -124,7 +124,7 @@ class CommandStat(models.Model):
 
     @classmethod
     @sync_to_async
-    def _save_command_stat(cls, command_stat):
+    def save_command_stat(cls, command_stat):
         while True:
             try:
                 command_stat.save()
@@ -135,7 +135,7 @@ class CommandStat(models.Model):
     @classmethod
     async def get_command_stats_dict(cls, filters=None):
         filter_stats_dict = {}
-        for command_stat in await CommandStat.get_all_entries_async():
+        for command_stat in await CommandStat.get_all_entries():
             command_stat = model_to_dict(command_stat)
             key = ""
             for idx, command_filter in enumerate(filters):
@@ -217,7 +217,7 @@ class UserPoint(models.Model):
     @sync_to_async
     def increment_points(self):
         alert_user = False
-        if self._message_counts_towards_points():
+        if self.message_counts_towards_points():
             point = random.randint(15, 25)
             self.points += point
             self.level_up_specific_points += point
@@ -266,7 +266,7 @@ class UserPoint(models.Model):
     def clear_all_entries():
         UserPoint.objects.all().delete()
 
-    def _message_counts_towards_points(self):
+    def message_counts_towards_points(self):
         return datetime.datetime.fromtimestamp(
             self.latest_time_xp_was_earned_epoch,
             pytz.timezone(settings.TIME_ZONE)
