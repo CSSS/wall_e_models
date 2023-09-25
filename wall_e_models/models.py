@@ -12,6 +12,11 @@ from django.conf import settings
 from django.db import models
 from django.forms import model_to_dict
 from django.utils import timezone
+from dateutil.tz import tz
+
+
+TIME_ZONE = 'Canada/Pacific'
+PACIFIC_TZ = tz.gettz(TIME_ZONE)
 
 from .customFields import GeneratedIdentityField
 import requests
@@ -449,3 +454,66 @@ class Reminder(models.Model):
         if seconds > 0:
             message += f" {seconds} seconds"
         return f"{message} from now"
+
+
+class HelpMessage(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    message_id = models.BigIntegerField(null=False)
+    channel_name = models.CharField(max_length=500, default=None, null=True)
+    channel_id = models.BigIntegerField(null=False)
+    help_message_expiration_date = models.BigIntegerField(default=0)
+    time_created = models.BigIntegerField(default=0)
+
+    @property
+    def get_expiration_date_pst(self):
+        return convert_utc_time_to_pacific(datetime.datetime.fromtimestamp(self.help_message_expiration_date))
+
+    @property
+    def get_pst_date_message_created(self):
+        return convert_utc_time_to_pacific(datetime.datetime.fromtimestamp(self.time_created))
+
+    @classmethod
+    @sync_to_async
+    def insert_record(cls, record: HelpMessage) -> None:
+        """Adds entry to HelpMessage table"""
+        record.save()
+
+    @classmethod
+    @sync_to_async
+    def delete_message(cls, help_message_record_to_delete):
+        help_message_record_to_delete.delete()
+
+    @classmethod
+    @sync_to_async
+    def get_messages_to_delete(cls):
+        return list(
+            HelpMessage.objects.all().filter(
+                help_message_expiration_date__lte=convert_utc_time_to_pacific(datetime.datetime.now()).timestamp()
+            )
+        )
+
+    def save(self, *args, **kwargs):
+        self.help_message_expiration_date = (
+            convert_utc_time_to_pacific(datetime.datetime.now()) + datetime.timedelta(minutes=1)
+        ).timestamp()
+        super(HelpMessage, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return (
+            f"[HelpMessage {self.id} for channel #{self.channel_name}({self.channel_id}) and message "
+            f"{self.message_id} that was created on"
+            f" {self.get_pst_date_message_created.strftime('%Y %b %-d %I:%M:%S %p %Z')}]"
+        )
+
+
+def convert_utc_time_to_pacific(utc_datetime):
+    """
+    Convert the given UTC timezone object to a PST timezone object
+
+    Keyword Arguments
+    utc_datetime -- the given UTC timezone object to convert
+
+    Return
+    datetime -- the PST timezone equivalent of the utc_datetime
+    """
+    return utc_datetime.astimezone(PACIFIC_TZ)
