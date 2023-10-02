@@ -517,3 +517,27 @@ def convert_utc_time_to_pacific(utc_datetime):
     datetime -- the PST timezone equivalent of the utc_datetime
     """
     return utc_datetime.astimezone(PACIFIC_TZ)
+
+
+class EmbedAvatar(models.Model):
+    avatar_discord_url = models.CharField(
+        max_length=5000
+    )
+    avatar_discord_permanent_url = models.CharField(
+        max_length=5000
+    )
+
+    @classmethod
+    @sync_to_async
+    def insert_record(cls, record: EmbedAvatar) -> None:
+        """Adds entry to EmbedAvatar table"""
+        record.save()
+
+    @classmethod
+    @sync_to_async
+    def get_avatar_by_url(cls, url):
+        avatars = EmbedAvatar.objects.all().filter(avatar_discord_url=url)
+        if len(avatars) == 0:
+            return None
+        else:
+            return avatars[0]
