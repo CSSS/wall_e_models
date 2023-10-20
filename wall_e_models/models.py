@@ -10,6 +10,7 @@ import pytz
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.db import models
+from django.db.models.constants import UniqueConstraint
 from django.forms import model_to_dict
 from django.utils import timezone
 from dateutil.tz import tz
@@ -30,10 +31,14 @@ class BanRecord(models.Model):
     mod_id = models.BigIntegerField(null=True)
     ban_date = models.BigIntegerField(null=True)
     reason = models.CharField(max_length=512, null=False)
-    unban_date = models.BigIntegerField(null=True, default=None)
+    unban_date = models.BigIntegerField(null=True, default=0)
 
     class Meta:
         db_table = 'wall_e_models_ban_records'
+        constraints = [
+            UniqueConstraint(fields=['user_id', 'unban_date'],
+                             name='unique_active_ban')
+        ]
 
     @classmethod
     @sync_to_async
@@ -45,7 +50,11 @@ class BanRecord(models.Model):
     @sync_to_async
     def insert_record(cls, record: BanRecord) -> None:
         """Adds entry to BanRecord table"""
-        record.save()
+        try:
+            record.save()
+        except Exception:
+            return False
+        return True
 
     @classmethod
     @sync_to_async
