@@ -10,7 +10,7 @@ import pytz
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.db import models
-from django.db.models.constants import UniqueConstraint
+from django.db.models.constraints import UniqueConstraint
 from django.forms import model_to_dict
 from django.utils import timezone
 from dateutil.tz import tz
@@ -31,7 +31,7 @@ class BanRecord(models.Model):
     mod_id = models.BigIntegerField(null=True)
     ban_date = models.BigIntegerField(null=True)
     reason = models.CharField(max_length=512, null=False)
-    unban_date = models.BigIntegerField(null=True, default=0)
+    unban_date = models.BigIntegerField(null=False, default = 0)
 
     class Meta:
         db_table = 'wall_e_models_ban_records'
@@ -61,21 +61,21 @@ class BanRecord(models.Model):
     def get_all_active_ban_user_ids(cls) -> List[int]:
         """Returns list of user_ids for all currently banned users"""
 
-        return list(BanRecord.objects.values_list('user_id', flat=True).filter(unban_date=None))
+        return list(BanRecord.objects.values_list('user_id', flat=True).filter(unban_date=0))
 
     @classmethod
     @sync_to_async
     def get_all_active_bans(cls) -> List[BanRecord]:
         """Returns list of usernames and user_ids for all currently banned users"""
 
-        return list(BanRecord.objects.values('username', 'user_id').filter(unban_date=None))
+        return list(BanRecord.objects.values('username', 'user_id').filter(unban_date=0))
 
     @classmethod
     @sync_to_async
     def get_active_bans_count(cls) -> int:
         """Returns count of all the active bans"""
 
-        return BanRecord.objects.filter(unban_date=None).count()
+        return BanRecord.objects.filter(unban_date=0).count()
 
     @classmethod
     @sync_to_async
