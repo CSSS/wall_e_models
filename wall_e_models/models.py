@@ -82,7 +82,7 @@ class BanRecord(models.Model):
     def unban_by_id(cls, user_id: int) -> str:
         """Set active=False for user with the given user_id. This representes unbanning a user."""
         try:
-            user = BanRecord.objects.get(user_id=user_id, unban_date=None)
+            user = BanRecord.objects.get(user_id=user_id, unban_date=0)
         except Exception:
             return None
 
