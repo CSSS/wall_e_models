@@ -2,7 +2,7 @@ from django.db import models
 from django.conf import settings
 
 ENV = getattr(settings, "ENVIRONMENT", "LOCALHOST")
-POSTGRES_SQL = getattr(settings, "POSTGRES_SQL", False)
+database_type = getattr(settings, "database_type", "sqlite3")
 
 
 class GeneratedIdentityField(models.AutoField):
@@ -28,7 +28,7 @@ class GeneratedIdentityField(models.AutoField):
         return name, path, args, kwargs
 
     def db_type(self, connection):
-        if POSTGRES_SQL:
+        if database_type == "postgresSQL":
             return f"INTEGER GENERATED {'ALWAYS' if self.always else 'BY DEFAULT'} AS IDENTITY"
         else:
             # migration 4 gives this error unless the db_type is just INTEGER
