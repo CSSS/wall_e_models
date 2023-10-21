@@ -81,6 +81,11 @@ class BanRecord(models.Model):
         user.save()
         return user.username
 
+    @classmethod
+    @sync_to_async
+    def user_is_banned(cls, user_id) -> bool:
+        return BanRecord.objects.all().filter(user_id=user_id).first() is not None
+
     def __str__(self) -> str:
         return f"ban_id=[{self.ban_id}] username=[{self.username}] user_id=[{self.user_id}] " \
                f"mod=[{self.mod}] mod_id=[{self.mod_id}] date=[{self.ban_date}] reason=[{self.reason}]" \
