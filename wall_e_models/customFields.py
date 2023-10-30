@@ -4,6 +4,15 @@ from django.conf import settings
 ENV = getattr(settings, "ENVIRONMENT", "LOCALHOST")
 database_type = getattr(settings, "database_type", "sqlite3")
 
+try:
+    # necessary if this is being called from wall_e and therefore the settings need to be picked up from
+    # django_settings instead of the settings file in the wall_e_models repo
+    import django_settings
+    ENV = getattr(django_settings, "ENVIRONMENT", "LOCALHOST")
+    database_type = getattr(django_settings, "database_type", "sqlite3")
+except ModuleNotFoundError:
+    pass
+
 
 class GeneratedIdentityField(models.AutoField):
     description = "An Integer column which uses `GENERATED {ALWAYS | BY DEFAULT} AS IDENTITY`. \
