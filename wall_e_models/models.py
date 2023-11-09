@@ -177,6 +177,30 @@ class UserPoint(models.Model):
     user_id = models.PositiveBigIntegerField(
         unique=True
     )
+    name = models.CharField(
+        max_length=500,
+        default=None,
+        null=True
+    )
+    nickname = models.CharField(
+        max_length=500,
+        default=None,
+        null=True
+    )
+    avatar_url = models.CharField(
+        max_length=1000,
+        default=None,
+        null=True
+    )
+    leveling_message_avatar_url = models.CharField(
+        max_length=1000,
+        default=None,
+        null=True
+    )
+    avatar_url_message_id = models.PositiveBigIntegerField(
+        default=None,
+        null=True
+    )
     points = models.PositiveBigIntegerField(
 
     )
@@ -199,6 +223,14 @@ class UserPoint(models.Model):
     @sync_to_async
     def async_save(self):
         self.save()
+
+    @sync_to_async
+    def async_bulk_update(self, users):
+        UserPoint.objects.bulk_update(
+            users,
+            ["nickname", 'name', 'avatar_url', 'leveling_message_avatar_url',
+             'avatar_url_message_id']
+        )
 
     @staticmethod
     @sync_to_async
