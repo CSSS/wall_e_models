@@ -355,7 +355,6 @@ class UserPoint(models.Model):
         avatar_file_name = 'levelling-avatar.png'
         try:
             self.leveling_update_attempt += 1
-            user_point_changed = False
             if self.avatar_url != member.display_avatar.url:
                 if self.avatar_url_message_id is not None:
                     avatar_msg = await levelling_website_avatar_channel.fetch_message(
@@ -371,15 +370,12 @@ class UserPoint(models.Model):
                 self.avatar_url = member.display_avatar.url
                 self.leveling_message_avatar_url = avatar_msg.attachments[0].url
                 self.avatar_url_message_id = avatar_msg.id
-                user_point_changed = True
-            user_point_changed = user_point_changed or self.nickname != member.nick
-            user_point_changed = user_point_changed or self.name != member.name
-            if user_point_changed:
-                self.nickname = member.nick
-                self.name = member.name
-                self.leveling_update_needed = False
-                self.leveling_update_attempt = 0
-                await self.async_save()
+            self.nickname = member.nick
+            self.name = member.name
+            self.leveling_update_needed = False
+            self.leveling_update_attempt = 0
+            self.deleted_member = False
+            await self.async_save()
         except Exception as e:
             logger.error(
                 "[wall_e_models models.py update_leveling_profile_info()] experienced following error when trying to "
