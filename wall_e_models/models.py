@@ -391,9 +391,11 @@ class UserPoint(models.Model):
                 os.remove(avatar_file_name)
             raise Exception(e)
 
-    async def mark_ready_for_levelling_profile_update(self):
-        user_updated = (not self.leveling_update_needed) or self.deleted_member or self.leveling_update_attempt > 0
-        if user_updated:
+    async def mark_ready_for_levelling_profile_update(self, member):
+        user_profile_data_changed = (
+            self.nickname != member.nick or self.name != member.name or self.avatar_url != member.display_avatar.url
+        )
+        if user_profile_data_changed:
             self.leveling_update_needed = True
             self.deleted_member = False
             self.leveling_update_attempt = 0
