@@ -2,10 +2,14 @@
 # https://stackoverflow.com/a/33533514
 from __future__ import annotations
 
+import asyncio
+import os
 from typing import List
 import datetime
 import random
 import time
+
+import discord
 import pytz
 from asgiref.sync import sync_to_async
 from django.conf import settings
@@ -219,6 +223,16 @@ class UserPoint(models.Model):
     hidden = models.BooleanField(
         default=False
     )
+    leveling_update_needed = models.BooleanField(
+        default=True
+    )
+    leveling_update_attempt = models.IntegerField(
+        default=0,
+        null=False
+    )
+    deleted_member = models.BooleanField(
+        default=False
+    )
 
     @sync_to_async
     def async_save(self):
@@ -241,7 +255,7 @@ class UserPoint(models.Model):
             user_id=user_id, points=points,
             level_up_specific_points=UserPoint.calculate_level_up_specific_points(points),
             message_count=message_count,
-            latest_time_xp_was_earned_epoch=latest_time_xp_was_earned.timestamp(), level_number=level,
+            latest_time_xp_was_earned_epoch=latest_time_xp_was_earned.timestamp(), level_number=level
         )
         user_point.save()
         return user_point
@@ -314,24 +328,76 @@ class UserPoint(models.Model):
             pytz.timezone(settings.TIME_ZONE)
         ) + datetime.timedelta(minutes=1) < datetime.datetime.now(tz=pytz.timezone(settings.TIME_ZONE))
 
-    @property
-    def username(self):
-        discord_header = {
-            "Authorization": f"Bot {settings.DISCORD_BOT_TOKEN}",
-            'Content-Type': 'application/json'
-        }
-        response = requests.get(
-            f"https://discord.com/api/users/{self.user_id}",
-            headers=discord_header
-        )
-
-        return response.json()['username'] if 'username' in response.json() else 'NA'
-
     @staticmethod
     @sync_to_async
     def load_to_dict():
-        return {user_point.user_id: user_point for user_point in UserPoint.objects.all()}
+        return {user_point.user_id: user_point for user_point in UserPoint.objects.all().order_by('-points')}
 
+
+    @staticmethod
+    @sync_to_async
+    def get_users_that_need_leveling_info_updated(top: int = None):
+        query = UserPoint.objects.all().filter(
+                leveling_update_needed=True, deleted_member=False, leveling_update_attempt__lt=5
+            ).order_by('-points')
+        if top is not None:
+            query = query[:top]
+        return list(query.values_list('user_id', flat=True))
+
+    @staticmethod
+    @sync_to_async
+    def get_number_of_users_that_need_leveling_info_updated():
+        return UserPoint.objects.all().filter(
+                leveling_update_needed=True, deleted_member=False, leveling_update_attempt__lt=5
+            ).count()
+
+    async def update_leveling_profile_info(self, logger, member, levelling_website_avatar_channel):
+        avatar_file_name = 'levelling-avatar.png'
+        try:
+            self.leveling_update_attempt += 1
+            user_point_changed = False
+            if self.avatar_url != member.display_avatar.url:
+                if self.avatar_url_message_id is not None:
+                    avatar_msg = await levelling_website_avatar_channel.fetch_message(
+                        self.avatar_url_message_id
+                    )
+                    await avatar_msg.delete()
+                with open(avatar_file_name, "wb") as file:
+                    file.write(requests.get(member.display_avatar.url).content)
+                avatar_msg = await levelling_website_avatar_channel.send(
+                    file=discord.File(avatar_file_name)
+                )
+                os.remove(avatar_file_name)
+                self.avatar_url = member.display_avatar.url
+                self.leveling_message_avatar_url = avatar_msg.attachments[0].url
+                self.avatar_url_message_id = avatar_msg.id
+                user_point_changed = True
+            user_point_changed = user_point_changed or self.nickname != member.nick
+            user_point_changed = user_point_changed or self.name != member.name
+            if user_point_changed:
+                self.nickname = member.nick
+                self.name = member.name
+                self.leveling_update_needed = False
+                self.leveling_update_attempt = 0
+                await self.async_save()
+        except Exception as e:
+            logger.error(
+                "[wall_e_models models.py update_leveling_profile_info()] experienced following error when trying to "
+                f"update the profile info for {member}\n{e}"
+            )
+            await asyncio.sleep(5)
+            await self.async_save()
+            if os.path.exists(avatar_file_name):
+                os.remove(avatar_file_name)
+            raise Exception(e)
+
+    async def mark_ready_for_levelling_profile_update(self):
+        user_updated = (not self.leveling_update_needed) or self.deleted_member or self.leveling_update_attempt > 0
+        if user_updated:
+            self.leveling_update_needed = True
+            self.deleted_member = False
+            self.leveling_update_attempt = 0
+            await self.async_save()
 
 class Level(models.Model):
     number = models.PositiveBigIntegerField(

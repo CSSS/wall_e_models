@@ -3,3 +3,4 @@ requests==2.31.0
 pytz==2018.5
 
 python-dateutil==2.8.1
+git+https://github.com/Rapptz/discord.py@9e2f2cb3af30c9d4c6d3ff4f7850832c05488d6f#egg=discord.py[voice]
