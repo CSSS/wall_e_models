@@ -356,6 +356,10 @@ class UserPoint(models.Model):
         try:
             self.leveling_update_attempt += 1
             if self.avatar_url != member.display_avatar.url:
+                logger.debug(
+                    f"[wall_e_models models.py update_leveling_profile_info()] detected avatar change for member "
+                    f"{member}"
+                )
                 if self.avatar_url_message_id is not None:
                     avatar_msg = await levelling_website_avatar_channel.fetch_message(
                         self.avatar_url_message_id
@@ -370,6 +374,16 @@ class UserPoint(models.Model):
                 self.avatar_url = member.display_avatar.url
                 self.leveling_message_avatar_url = avatar_msg.attachments[0].url
                 self.avatar_url_message_id = avatar_msg.id
+            if self.nickname != member.nick:
+                logger.debug(
+                    f"[wall_e_models models.py update_leveling_profile_info()] detected nickname change for member "
+                    f"{member}"
+                )
+            if self.name != member.name:
+                logger.debug(
+                    f"[wall_e_models models.py update_leveling_profile_info()] detected name change for member "
+                    f"{member}"
+                )
             self.nickname = member.nick
             self.name = member.name
             self.leveling_update_needed = False
