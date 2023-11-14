@@ -14,6 +14,7 @@ import pytz
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.db import models
+from django.db.models import Q
 from django.forms import model_to_dict
 from django.utils import timezone
 from dateutil.tz import tz
@@ -351,15 +352,26 @@ class UserPoint(models.Model):
                 leveling_update_needed=True, deleted_member=False, leveling_update_attempt__lt=5
             ).count()
 
-    async def update_leveling_profile_info(self, logger, member, levelling_website_avatar_channel):
+    async def update_leveling_profile_info(self, logger, member, levelling_website_avatar_channel, updated_user_log_id):
         avatar_file_name = 'levelling-avatar.png'
         try:
             self.leveling_update_attempt += 1
-            if self.avatar_url != member.display_avatar.url:
-                logger.debug(
-                    f"[wall_e_models models.py update_leveling_profile_info()] detected avatar change for member "
-                    f"{member}"
-                )
+            changes_detected = ""
+            avatar_changed = self.avatar_url != member.display_avatar.url
+            name_changed = self.name != member.name
+            if avatar_changed:
+                changes_detected = "avatar"
+            if self.nickname != member.nick:
+                if changes_detected:
+                    changes_detected += ", "
+                    if not name_changed:
+                        changes_detected += " and "
+                changes_detected += "nickname"
+            if name_changed:
+                if changes_detected:
+                    changes_detected += ", and "
+                changes_detected += "name"
+            if avatar_changed:
                 if self.avatar_url_message_id is not None:
                     avatar_msg = await levelling_website_avatar_channel.fetch_message(
                         self.avatar_url_message_id
@@ -374,22 +386,17 @@ class UserPoint(models.Model):
                 self.avatar_url = member.display_avatar.url
                 self.leveling_message_avatar_url = avatar_msg.attachments[0].url
                 self.avatar_url_message_id = avatar_msg.id
-            if self.nickname != member.nick:
-                logger.debug(
-                    f"[wall_e_models models.py update_leveling_profile_info()] detected nickname change for member "
-                    f"{member}"
-                )
-            if self.name != member.name:
-                logger.debug(
-                    f"[wall_e_models models.py update_leveling_profile_info()] detected name change for member "
-                    f"{member}"
-                )
+            logger.debug(
+                f"[wall_e_models models.py update_leveling_profile_info()] detected {changes_detected} change for "
+                f"member {member}"
+            )
             self.nickname = member.nick
             self.name = member.name
             self.leveling_update_needed = False
             self.leveling_update_attempt = 0
             self.deleted_member = False
             await self.async_save()
+            await UpdatedUser.async_delete(updated_user_log_id)
         except Exception as e:
             logger.error(
                 "[wall_e_models models.py update_leveling_profile_info()] experienced following error when trying to "
@@ -410,6 +417,39 @@ class UserPoint(models.Model):
             self.deleted_member = False
             self.leveling_update_attempt = 0
             await self.async_save()
+
+
+class UpdatedUser(models.Model):
+    user_point = models.OneToOneField(
+        UserPoint, on_delete=models.CASCADE,
+        unique=True
+    )
+
+    @staticmethod
+    @sync_to_async
+    def get_updated_user_logs(top: int = None):
+        query = UpdatedUser.objects.all()
+        if top is not None:
+            query = query[:top]
+        return list(query.values_list('id', 'user_point__user_id'))
+
+    @sync_to_async
+    def async_save(self):
+        self.save()
+
+    @staticmethod
+    @sync_to_async
+    def async_delete(async_delete):
+        UpdatedUser.objects.get(id=async_delete).delete()
+
+    @staticmethod
+    @sync_to_async
+    def user_update_is_unique(member: discord.Member):
+        return UserPoint.objects.filter(user_id=member.id).exclude(
+            Q(avatar_url=member.display_avatar.url) &
+            Q(nickname=member.nick) &
+            Q(name=member.name)
+        ).filter(updateduser__isnull=True).first()
 
 class Level(models.Model):
     number = models.PositiveBigIntegerField(
