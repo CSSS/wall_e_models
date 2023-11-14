@@ -359,17 +359,20 @@ class UserPoint(models.Model):
             changes_detected = ""
             avatar_changed = self.avatar_url != member.display_avatar.url
             name_changed = self.name != member.name
+            number_of_changes = 0
             if avatar_changed:
+                number_of_changes += 1
                 changes_detected = "avatar"
             if self.nickname != member.nick:
+                number_of_changes += 1
                 if changes_detected:
-                    changes_detected += ", "
-                    if not name_changed:
-                        changes_detected += " and "
+                    changes_detected += ", " if name_changed else " and "
                 changes_detected += "nickname"
             if name_changed:
                 if changes_detected:
-                    changes_detected += ", and "
+                    if number_of_changes == 2:
+                        changes_detected += ","
+                    changes_detected += " and "
                 changes_detected += "name"
             if avatar_changed:
                 if self.avatar_url_message_id is not None:
@@ -377,6 +380,10 @@ class UserPoint(models.Model):
                         self.avatar_url_message_id
                     )
                     await avatar_msg.delete()
+                    logger.debug(
+                        f"[wall_e_models models.py update_leveling_profile_info()] deleted old avatar message for "
+                        f"member {member}"
+                    )
                 with open(avatar_file_name, "wb") as file:
                     file.write(requests.get(member.display_avatar.url).content)
                 avatar_msg = await levelling_website_avatar_channel.send(
@@ -420,9 +427,8 @@ class UserPoint(models.Model):
 
 
 class UpdatedUser(models.Model):
-    user_point = models.OneToOneField(
-        UserPoint, on_delete=models.CASCADE,
-        unique=True
+    user_point = models.ForeignKey(
+        UserPoint, on_delete=models.CASCADE
     )
 
     @staticmethod
@@ -444,12 +450,12 @@ class UpdatedUser(models.Model):
 
     @staticmethod
     @sync_to_async
-    def user_update_is_unique(member: discord.Member):
+    def outdated_user_profile(member: discord.Member):
         return UserPoint.objects.filter(user_id=member.id).exclude(
             Q(avatar_url=member.display_avatar.url) &
             Q(nickname=member.nick) &
             Q(name=member.name)
-        ).filter(updateduser__isnull=True).first()
+        ).first()
 
 class Level(models.Model):
     number = models.PositiveBigIntegerField(
