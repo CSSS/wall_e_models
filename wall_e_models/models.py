@@ -246,12 +246,8 @@ class UserPoint(models.Model):
         self.save()
 
     @sync_to_async
-    def async_bulk_update(self, users):
-        UserPoint.objects.bulk_update(
-            users,
-            ["nickname", 'name', 'avatar_url', 'leveling_message_avatar_url',
-             'avatar_url_message_id']
-        )
+    def async_bulk_update(self, users, objects_to_update):
+        UserPoint.objects.bulk_update(users, objects_to_update)
 
     @staticmethod
     @sync_to_async
