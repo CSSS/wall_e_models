@@ -19,6 +19,7 @@ from django.forms import model_to_dict
 from django.utils import timezone
 from dateutil.tz import tz
 
+from .pstdatetime import PSTDateTimeField, pstdatetime
 
 TIME_ZONE = 'Canada/Pacific'
 PACIFIC_TZ = tz.gettz(TIME_ZONE)
@@ -224,15 +225,19 @@ class UserPoint(models.Model):
     hidden = models.BooleanField(
         default=False
     )
-    leveling_update_needed = models.BooleanField(
-        default=True
-    )
     leveling_update_attempt = models.IntegerField(
         default=0,
         null=False
     )
-    deleted_member = models.BooleanField(
-        default=False
+    # there needed to be a way to regularly check all the user's profiles to ensure the leaderboard website was as
+    # up-to-date as possible. At the time of making this comment, the CSSS discord guild has just a bit over 7000
+    # members, which seemed like a bad idea to start calling the discord API for 7000 users in a short burst of time
+    # a bad idea as well as a bad idea to bulk_update that many people. To combat this, I decided to use the
+    # pigeonhole principle when spreading the load of when to update the users. This is implemented in
+    # set_null_date_to_checks in wall_e
+    date_to_check = models.IntegerField(
+        default=None,
+        null=True
     )
 
     @sync_to_async
@@ -347,10 +352,10 @@ class UserPoint(models.Model):
 
     @staticmethod
     @sync_to_async
-    def get_number_of_users_that_need_leveling_info_updated():
-        return UserPoint.objects.all().filter(
-                leveling_update_needed=True, deleted_member=False, leveling_update_attempt__lt=5
-            ).count()
+    def get_users_that_need_leveling_info_updated():
+        today = pstdatetime.now().pst.day
+        query = UserPoint.objects.all().filter(date_to_check=today).order_by('-points')
+        return list(query.values_list('user_id', flat=True))
 
     async def update_leveling_profile_info(self, logger, member, levelling_website_avatar_channel, updated_user_log_id):
         avatar_file_name = 'levelling-avatar.png'
