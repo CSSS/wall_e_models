@@ -339,13 +339,19 @@ class UserPoint(models.Model):
 
     @staticmethod
     @sync_to_async
-    def get_users_that_need_leveling_info_updated(top: int = None):
-        query = UserPoint.objects.all().filter(
-                leveling_update_needed=True, deleted_member=False, leveling_update_attempt__lt=5
-            ).order_by('-points')
-        if top is not None:
-            query = query[:top]
-        return list(query.values_list('user_id', flat=True))
+    def reset_profile_info():
+        user_points = UserPoint.objects.all()
+        for user_point in user_points:
+            user_point.name = None
+            user_point.nickname = None
+            user_point.avatar_url = None
+            user_point.leveling_message_avatar_url = None
+            user_point.avatar_url_message_id = None
+            user_point.leveling_update_attempt = 0
+        UserPoint.objects.bulk_update(user_points, [
+            'name', 'nickname', 'avatar_url', 'leveling_message_avatar_url', 'avatar_url_message_id',
+            'leveling_update_attempt'
+        ])
 
     @staticmethod
     @sync_to_async
