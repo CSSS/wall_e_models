@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 from typing import List
 import datetime
 import random
@@ -19,6 +20,7 @@ from django.forms import model_to_dict
 from django.utils import timezone
 from dateutil.tz import tz
 
+from .pstdatetime import PSTDateTimeField, pstdatetime
 
 TIME_ZONE = 'Canada/Pacific'
 PACIFIC_TZ = tz.gettz(TIME_ZONE)
@@ -224,15 +226,19 @@ class UserPoint(models.Model):
     hidden = models.BooleanField(
         default=False
     )
-    leveling_update_needed = models.BooleanField(
-        default=True
-    )
     leveling_update_attempt = models.IntegerField(
         default=0,
         null=False
     )
-    deleted_member = models.BooleanField(
-        default=False
+    # there needed to be a way to regularly check all the user's profiles to ensure the leaderboard website was as
+    # up-to-date as possible. At the time of making this comment, the CSSS discord guild has just a bit over 7000
+    # members, which seemed like a bad idea to start calling the discord API for 7000 users in a short burst of time
+    # a bad idea as well as a bad idea to bulk_update that many people. To combat this, I decided to use the
+    # pigeonhole principle when spreading the load of when to update the users. This is implemented in
+    # set_null_date_to_checks in wall_e
+    date_to_check = models.IntegerField(
+        default=None,
+        null=True
     )
 
     @sync_to_async
@@ -240,12 +246,8 @@ class UserPoint(models.Model):
         self.save()
 
     @sync_to_async
-    def async_bulk_update(self, users):
-        UserPoint.objects.bulk_update(
-            users,
-            ["nickname", 'name', 'avatar_url', 'leveling_message_avatar_url',
-             'avatar_url_message_id']
-        )
+    def async_bulk_update(self, users, objects_to_update):
+        UserPoint.objects.bulk_update(users, objects_to_update)
 
     @staticmethod
     @sync_to_async
@@ -337,93 +339,94 @@ class UserPoint(models.Model):
 
     @staticmethod
     @sync_to_async
-    def get_users_that_need_leveling_info_updated(top: int = None):
-        query = UserPoint.objects.all().filter(
-                leveling_update_needed=True, deleted_member=False, leveling_update_attempt__lt=5
-            ).order_by('-points')
-        if top is not None:
-            query = query[:top]
-        return list(query.values_list('user_id', flat=True))
+    def reset_profile_info():
+        user_points = UserPoint.objects.all()
+        for user_point in user_points:
+            user_point.name = None
+            user_point.nickname = None
+            user_point.avatar_url = None
+            user_point.leveling_message_avatar_url = None
+            user_point.avatar_url_message_id = None
+            user_point.leveling_update_attempt = 0
+        UserPoint.objects.bulk_update(user_points, [
+            'name', 'nickname', 'avatar_url', 'leveling_message_avatar_url', 'avatar_url_message_id',
+            'leveling_update_attempt'
+        ])
 
     @staticmethod
     @sync_to_async
-    def get_number_of_users_that_need_leveling_info_updated():
-        return UserPoint.objects.all().filter(
-                leveling_update_needed=True, deleted_member=False, leveling_update_attempt__lt=5
-            ).count()
+    def get_users_that_need_leveling_info_updated():
+        today = pstdatetime.now().pst.day
+        query = UserPoint.objects.all().filter(date_to_check=today).order_by('-points')
+        return list(query.values_list('user_id', flat=True))
 
-    async def update_leveling_profile_info(self, logger, member, levelling_website_avatar_channel, updated_user_log_id):
+    async def update_leveling_profile_info(self, logger, member, levelling_website_avatar_channel,
+                                           updated_user_log_id=None):
         avatar_file_name = 'levelling-avatar.png'
-        try:
-            self.leveling_update_attempt += 1
-            changes_detected = ""
-            avatar_changed = self.avatar_url != member.display_avatar.url
-            name_changed = self.name != member.name
-            number_of_changes = 0
-            if avatar_changed:
-                number_of_changes += 1
-                changes_detected = "avatar"
-            if self.nickname != member.nick:
-                number_of_changes += 1
-                if changes_detected:
-                    changes_detected += ", " if name_changed else " and "
-                changes_detected += "nickname"
-            if name_changed:
-                if changes_detected:
-                    if number_of_changes == 2:
-                        changes_detected += ","
-                    changes_detected += " and "
-                changes_detected += "name"
-            if avatar_changed:
-                if self.avatar_url_message_id is not None:
-                    avatar_msg = await levelling_website_avatar_channel.fetch_message(
-                        self.avatar_url_message_id
+        if not re.match(r"Deleted User \w*$", member.name):
+            try:
+                self.leveling_update_attempt += 1
+                changes_detected = ""
+                avatar_changed = self.avatar_url != member.display_avatar.url
+                name_changed = self.name != member.name
+                number_of_changes = 0
+                if avatar_changed:
+                    number_of_changes += 1
+                    changes_detected = "avatar"
+                if type(member) == discord.Member:  # necessary because if the user is no longer in the Guild,
+                    # then they don't have a nickname on it
+                    if self.nickname != member.nick:
+                        number_of_changes += 1
+                        if changes_detected:
+                            changes_detected += ", " if name_changed else " and "
+                        changes_detected += "nickname"
+                if name_changed:
+                    if changes_detected:
+                        if number_of_changes == 2:
+                            changes_detected += ","
+                        changes_detected += " and "
+                    changes_detected += "name"
+                    number_of_changes += 1
+                if avatar_changed:
+                    if self.avatar_url_message_id is not None:
+                        avatar_msg = await levelling_website_avatar_channel.fetch_message(
+                            self.avatar_url_message_id
+                        )
+                        await avatar_msg.delete()
+                        logger.debug(
+                            f"[wall_e_models models.py update_leveling_profile_info()] deleted old avatar message for "
+                            f"member {member}"
+                        )
+                    with open(avatar_file_name, "wb") as file:
+                        file.write(requests.get(member.display_avatar.url).content)
+                    avatar_msg = await levelling_website_avatar_channel.send(
+                        file=discord.File(avatar_file_name)
                     )
-                    await avatar_msg.delete()
+                    os.remove(avatar_file_name)
+                    self.avatar_url = member.display_avatar.url
+                    self.leveling_message_avatar_url = avatar_msg.attachments[0].url
+                    self.avatar_url_message_id = avatar_msg.id
+                if number_of_changes > 0:
                     logger.debug(
-                        f"[wall_e_models models.py update_leveling_profile_info()] deleted old avatar message for "
+                        f"[wall_e_models models.py update_leveling_profile_info()] detected {changes_detected} change for "
                         f"member {member}"
                     )
-                with open(avatar_file_name, "wb") as file:
-                    file.write(requests.get(member.display_avatar.url).content)
-                avatar_msg = await levelling_website_avatar_channel.send(
-                    file=discord.File(avatar_file_name)
+                    self.nickname = member.nick if type(member) == discord.Member else None
+                    self.name = member.name
+                    self.leveling_update_attempt = 0
+                    await self.async_save()
+                if updated_user_log_id is not None:
+                    await UpdatedUser.async_delete(updated_user_log_id)
+            except Exception as e:
+                logger.error(
+                    "[wall_e_models models.py update_leveling_profile_info()] experienced following error when trying to "
+                    f"update the profile info for {member}\n{e}"
                 )
-                os.remove(avatar_file_name)
-                self.avatar_url = member.display_avatar.url
-                self.leveling_message_avatar_url = avatar_msg.attachments[0].url
-                self.avatar_url_message_id = avatar_msg.id
-            logger.debug(
-                f"[wall_e_models models.py update_leveling_profile_info()] detected {changes_detected} change for "
-                f"member {member}"
-            )
-            self.nickname = member.nick
-            self.name = member.name
-            self.leveling_update_needed = False
-            self.leveling_update_attempt = 0
-            self.deleted_member = False
-            await self.async_save()
-            await UpdatedUser.async_delete(updated_user_log_id)
-        except Exception as e:
-            logger.error(
-                "[wall_e_models models.py update_leveling_profile_info()] experienced following error when trying to "
-                f"update the profile info for {member}\n{e}"
-            )
-            await asyncio.sleep(5)
-            await self.async_save()
-            if os.path.exists(avatar_file_name):
-                os.remove(avatar_file_name)
-            raise Exception(e)
-
-    async def mark_ready_for_levelling_profile_update(self, member):
-        user_profile_data_changed = (
-            self.nickname != member.nick or self.name != member.name or self.avatar_url != member.display_avatar.url
-        )
-        if user_profile_data_changed:
-            self.leveling_update_needed = True
-            self.deleted_member = False
-            self.leveling_update_attempt = 0
-            await self.async_save()
+                await asyncio.sleep(5)
+                await self.async_save()
+                if os.path.exists(avatar_file_name):
+                    os.remove(avatar_file_name)
+                raise Exception(e)
 
 
 class UpdatedUser(models.Model):
