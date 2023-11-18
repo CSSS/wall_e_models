@@ -369,6 +369,7 @@ class UserPoint(models.Model):
     async def update_leveling_profile_info(self, logger, member, levelling_website_avatar_channel,
                                            updated_user_log_id=None):
         avatar_file_name = 'levelling-avatar.png'
+        user_updated = False
         if not re.match(r"Deleted User \w*$", member.name):
             try:
                 self.leveling_update_attempt += 1
@@ -420,6 +421,7 @@ class UserPoint(models.Model):
                     self.nickname = member.nick if type(member) == discord.Member else None
                     self.name = member.name
                     self.leveling_update_attempt = 0
+                    user_updated = True
                     await self.async_save()
                 if updated_user_log_id is not None:
                     await UpdatedUser.async_delete(updated_user_log_id)
@@ -433,6 +435,7 @@ class UserPoint(models.Model):
                 if os.path.exists(avatar_file_name):
                     os.remove(avatar_file_name)
                 raise Exception(e)
+        return user_updated
 
 
 class UpdatedUser(models.Model):
