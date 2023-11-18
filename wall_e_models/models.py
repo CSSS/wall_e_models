@@ -339,16 +339,6 @@ class UserPoint(models.Model):
         self.hidden = False
         self.save()
 
-    @staticmethod
-    @sync_to_async
-    def user_points_have_been_imported():
-        return len(list(UserPoint.objects.all()[:1])) == 1
-
-    @staticmethod
-    @sync_to_async
-    def clear_all_entries():
-        UserPoint.objects.all().delete()
-
     def message_counts_towards_points(self):
         return datetime.datetime.fromtimestamp(
             self.latest_time_xp_was_earned_epoch,
@@ -357,7 +347,7 @@ class UserPoint(models.Model):
 
     @staticmethod
     @sync_to_async
-    def load_to_dict():
+    def load_to_cache():
         return {user_point.user_id: user_point for user_point in UserPoint.objects.all().order_by('-points')}
 
     @staticmethod
@@ -508,17 +498,12 @@ class Level(models.Model):
 
     @staticmethod
     @sync_to_async
-    def level_points_have_been_imported():
-        return len(list(Level.objects.all()[:1])) == 1
+    def all_level_have_been_imported_into_database():
+        return Level.objects.all().count() == 100
 
     @staticmethod
     @sync_to_async
-    def clear_all_entries():
-        Level.objects.all().delete()
-
-    @staticmethod
-    @sync_to_async
-    def load_to_dict():
+    def load_to_cache():
         return {level.number: level for level in Level.objects.all()}
 
     @sync_to_async
