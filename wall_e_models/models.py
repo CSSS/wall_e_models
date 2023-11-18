@@ -499,7 +499,7 @@ class Level(models.Model):
     @staticmethod
     @sync_to_async
     def all_level_have_been_imported_into_database():
-        return Level.objects.all().count() == 100
+        return Level.objects.all().count() == 101
 
     @staticmethod
     @sync_to_async
