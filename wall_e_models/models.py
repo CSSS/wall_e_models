@@ -436,12 +436,11 @@ class UpdatedUser(models.Model):
 
     @staticmethod
     @sync_to_async
-    def outdated_user_profile(member: discord.Member):
-        return UserPoint.objects.filter(user_id=member.id).exclude(
-            Q(avatar_url=member.display_avatar.url) &
-            Q(nickname=member.nick) &
-            Q(name=member.name)
-        ).first()
+    def outdated_user_profile(member):
+        exclusion_filter = Q(avatar_url=member.display_avatar.url) & Q(name=member.name)
+        if type(member) == discord.Member:
+            exclusion_filter = exclusion_filter & Q(nickname=member.nick)
+        return UserPoint.objects.filter(user_id=member.id).exclude(exclusion_filter).first()
 
 class Level(models.Model):
     number = models.PositiveBigIntegerField(
