@@ -180,6 +180,30 @@ class CommandStat(models.Model):
         super(CommandStat, self).save(*args, **kwargs)
 
 
+class ProfileBucketInProgress(models.Model):
+    bucket_number_completed = models.IntegerField(
+        default=None,
+        null=True
+    )
+
+    @staticmethod
+    @sync_to_async
+    def retrieve_entry():
+        return ProfileBucketInProgress.objects.all().first()
+
+    @staticmethod
+    @sync_to_async
+    def create_entry():
+        profile_bucket_in_progress = ProfileBucketInProgress(bucket_number_completed=1)
+        profile_bucket_in_progress.save()
+        return profile_bucket_in_progress
+
+    @staticmethod
+    @sync_to_async
+    def async_save(profile_bucket_in_progress):
+        profile_bucket_in_progress.save()
+
+
 class UserPoint(models.Model):
     user_id = models.PositiveBigIntegerField(
         unique=True
@@ -235,8 +259,8 @@ class UserPoint(models.Model):
     # members, which seemed like a bad idea to start calling the discord API for 7000 users in a short burst of time
     # a bad idea as well as a bad idea to bulk_update that many people. To combat this, I decided to use the
     # pigeonhole principle when spreading the load of when to update the users. This is implemented in
-    # set_null_date_to_checks in wall_e
-    date_to_check = models.IntegerField(
+    # set_bucket_numbers in wall_e
+    bucket_number = models.IntegerField(
         default=None,
         null=True
     )
@@ -338,9 +362,8 @@ class UserPoint(models.Model):
 
     @staticmethod
     @sync_to_async
-    def get_users_that_need_leveling_info_updated():
-        today = pstdatetime.now().pst.day
-        query = UserPoint.objects.all().filter(date_to_check=today).order_by('-points')
+    def get_users_that_need_leveling_info_updated(bucket_number):
+        query = UserPoint.objects.all().filter(bucket_number=bucket_number).order_by('-points')
         return list(query.values_list('user_id', flat=True))
 
     async def update_leveling_profile_info(self, logger, member, levelling_website_avatar_channel,
