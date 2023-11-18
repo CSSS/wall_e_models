@@ -20,7 +20,7 @@ from django.forms import model_to_dict
 from django.utils import timezone
 from dateutil.tz import tz
 
-from .pstdatetime import PSTDateTimeField, pstdatetime
+from .pstdatetime import pstdatetime
 
 TIME_ZONE = 'Canada/Pacific'
 PACIFIC_TZ = tz.gettz(TIME_ZONE)
@@ -335,23 +335,6 @@ class UserPoint(models.Model):
     @sync_to_async
     def load_to_dict():
         return {user_point.user_id: user_point for user_point in UserPoint.objects.all().order_by('-points')}
-
-
-    @staticmethod
-    @sync_to_async
-    def reset_profile_info():
-        user_points = UserPoint.objects.all()
-        for user_point in user_points:
-            user_point.name = None
-            user_point.nickname = None
-            user_point.avatar_url = None
-            user_point.leveling_message_avatar_url = None
-            user_point.avatar_url_message_id = None
-            user_point.leveling_update_attempt = 0
-        UserPoint.objects.bulk_update(user_points, [
-            'name', 'nickname', 'avatar_url', 'leveling_message_avatar_url', 'avatar_url_message_id',
-            'leveling_update_attempt'
-        ])
 
     @staticmethod
     @sync_to_async
