@@ -581,8 +581,8 @@ class Reminder(models.Model):
     def save_reminder(cls, reminder_to_save):
         reminder_to_save.save()
 
-    def get_countdown(self):
-        seconds = int(self.reminder_date_epoch - time.time())
+    def get_countdown(self, current_time):
+        seconds = round(self.reminder_date_epoch - current_time.timestamp())
         day = seconds // (24 * 3600)
         seconds = seconds % (24 * 3600)
         hour = seconds // 3600
