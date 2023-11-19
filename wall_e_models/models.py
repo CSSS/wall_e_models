@@ -358,9 +358,9 @@ class UserPoint(models.Model):
 
     async def update_leveling_profile_info(self, logger, member, levelling_website_avatar_channel,
                                            updated_user_log_id=None):
-        avatar_file_name = 'levelling-avatar.png'
         user_updated = False
         if not re.match(r"Deleted User \w*$", member.name):
+            avatar_file_name = f'levelling-avatar-{member.name}-{time.time()}.png'
             try:
                 self.leveling_update_attempt += 1
                 changes_detected = ""
