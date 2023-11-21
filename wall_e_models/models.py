@@ -5,10 +5,10 @@ from __future__ import annotations
 import asyncio
 import os
 import re
+import time
 from typing import List
 import datetime
 import random
-import time
 
 import discord
 import pytz
@@ -20,13 +20,11 @@ from django.forms import model_to_dict
 from django.utils import timezone
 from dateutil.tz import tz
 
-from .pstdatetime import pstdatetime
-
 TIME_ZONE = 'Canada/Pacific'
 PACIFIC_TZ = tz.gettz(TIME_ZONE)
 
-from .customFields import GeneratedIdentityField
-import requests
+from .customFields import GeneratedIdentityField  # noqa: E402
+import requests  # noqa: E402
 
 
 class BanRecord(models.Model):
@@ -77,8 +75,8 @@ class BanRecord(models.Model):
 
     @classmethod
     @sync_to_async
-    def unban_by_id(cls, user_id: int) -> str:
-        """Set active=False for user with the given user_id. This representes unbanning a user."""
+    def unban_by_id(cls, user_id: int) -> str | None:
+        """Set active=False for user with the given user_id. This represents unbanning a user."""
         try:
             user = BanRecord.objects.get(user_id=user_id, unban_date=None)
         except Exception:
@@ -289,11 +287,11 @@ class UserPoint(models.Model):
 
     @classmethod
     def calculate_level_up_specific_points(cls, points):
-        indx = 0
+        index = 0
         levels = Level.objects.all().order_by('total_points_required')
-        while levels[indx].xp_needed_to_level_up_to_next_level < points and indx < len(levels):
-            points -= levels[indx].xp_needed_to_level_up_to_next_level
-            indx += 1
+        while levels[index].xp_needed_to_level_up_to_next_level < points and index < len(levels):
+            points -= levels[index].xp_needed_to_level_up_to_next_level
+            index += 1
 
         return points
 
@@ -405,8 +403,8 @@ class UserPoint(models.Model):
                     self.avatar_url_message_id = avatar_msg.id
                 if number_of_changes > 0:
                     logger.debug(
-                        f"[wall_e_models models.py update_leveling_profile_info()] detected {changes_detected} change for "
-                        f"member {member}"
+                        f"[wall_e_models models.py update_leveling_profile_info()] detected {changes_detected}"
+                        f" change for member {member}"
                     )
                     self.nickname = member.nick if type(member) == discord.Member else None
                     self.name = member.name
@@ -417,8 +415,8 @@ class UserPoint(models.Model):
                     await UpdatedUser.async_delete(updated_user_log_id)
             except Exception as e:
                 logger.error(
-                    "[wall_e_models models.py update_leveling_profile_info()] experienced following error when trying to "
-                    f"update the profile info for {member}\n{e}"
+                    "[wall_e_models models.py update_leveling_profile_info()] experienced following error when "
+                    f"trying to update the profile info for {member}\n{e}"
                 )
                 await asyncio.sleep(5)
                 await self.async_save()
@@ -457,6 +455,7 @@ class UpdatedUser(models.Model):
         if type(member) == discord.Member:
             exclusion_filter = exclusion_filter & Q(nickname=member.nick)
         return UserPoint.objects.filter(user_id=member.id).exclude(exclusion_filter).first()
+
 
 class Level(models.Model):
     number = models.PositiveBigIntegerField(
@@ -564,7 +563,6 @@ class Reminder(models.Model):
         else:
             return reminders[0]
 
-
     @classmethod
     @sync_to_async
     def delete_reminder_by_id(cls, reminder_to_delete):
@@ -580,12 +578,10 @@ class Reminder(models.Model):
     def get_reminder_by_author(cls, author_id):
         return list(Reminder.objects.all().filter(author_id=author_id).order_by('reminder_date_epoch'))
 
-
     @classmethod
     @sync_to_async
     def get_all_reminders(cls):
         return list(Reminder.objects.all().order_by('reminder_date_epoch'))
-
 
     @classmethod
     @sync_to_async
