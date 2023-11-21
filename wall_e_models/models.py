@@ -522,6 +522,9 @@ class Level(models.Model):
         self.role_id = None
         self.save()
 
+    def __str__(self):
+        return f"[Level {self.number} - {self.role_name}]"
+
 
 class Reminder(models.Model):
     id = models.BigAutoField(
