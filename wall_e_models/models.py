@@ -358,7 +358,8 @@ class UserPoint(models.Model):
                                            updated_user_log_id=None):
         user_updated = False
         if not re.match(r"Deleted User \w*$", member.name):
-            avatar_file_name = f'levelling-avatar-{member.name}-{time.time()}.png'
+            file_name_friendly_member_name = member.name.replace("/", "").replace("\\", "")
+            avatar_file_name = f'levelling-avatar-{file_name_friendly_member_name}-{time.time()}.png'
             try:
                 self.leveling_update_attempt += 1
                 changes_detected = ""
