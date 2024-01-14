@@ -37,7 +37,7 @@ class GeneratedIdentityField(models.AutoField):
         return name, path, args, kwargs
 
     def db_type(self, connection):
-        if database_type == "postgresSQL":
+        if database_type == "postgreSQL":
             return f"INTEGER GENERATED {'ALWAYS' if self.always else 'BY DEFAULT'} AS IDENTITY"
         else:
             # migration 4 gives this error unless the db_type is just INTEGER
