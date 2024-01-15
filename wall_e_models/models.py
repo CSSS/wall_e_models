@@ -43,12 +43,11 @@ class BanRecord(models.Model):
     is_purged = models.BooleanField(default=True) # need to be changed to False after first migration
     purge_window_days = models.IntegerField(default=1)
 
-    constraints = [
-        UniqueConstraint(fields=['user_id'], name='unique_active_ban', condition=Q(epoch_unban_date__isnull=True))
-    ]
-
     class Meta:
         db_table = 'wall_e_models_ban_records'
+        constraints = [
+            UniqueConstraint(fields=['user_id'], name='unique_active_ban', condition=Q(epoch_unban_date__isnull=True))
+        ]
 
     @classmethod
     @sync_to_async
