@@ -15,10 +15,12 @@ import pytz
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.db import models
-from django.db.models import Q
+from django.db.models import Q, UniqueConstraint
 from django.forms import model_to_dict
 from django.utils import timezone
 from dateutil.tz import tz
+
+from .pstdatetime import PSTDateTimeField
 
 TIME_ZONE = 'Canada/Pacific'
 PACIFIC_TZ = tz.gettz(TIME_ZONE)
@@ -33,9 +35,17 @@ class BanRecord(models.Model):
     user_id = models.BigIntegerField(null=False)
     mod = models.CharField(max_length=37, null=True)
     mod_id = models.BigIntegerField(null=True)
-    ban_date = models.BigIntegerField(null=True)
+    epoch_ban_date = models.BigIntegerField(null=True)
+    # ban_date = PSTDateTimeField(default=timezone.now)
     reason = models.CharField(max_length=512, null=False)
-    unban_date = models.BigIntegerField(null=True, default=None)
+    epoch_unban_date = models.BigIntegerField(null=True, default=None)
+    # unban_date = PSTDateTimeField(null=True, default=None)
+    is_purged = models.BooleanField(default=True) # need to be changed to False after first migration
+    purge_window_days = models.IntegerField(default=1)
+
+    constraints = [
+        UniqueConstraint(fields=['user_id'], name='unique_active_ban', condition=Q(epoch_unban_date__isnull=True))
+    ]
 
     class Meta:
         db_table = 'wall_e_models_ban_records'
@@ -54,35 +64,41 @@ class BanRecord(models.Model):
 
     @classmethod
     @sync_to_async
-    def get_all_active_ban_user_ids(cls) -> List[int]:
-        """Returns list of user_ids for all currently banned users"""
-
-        return list(BanRecord.objects.values_list('user_id', flat=True).filter(unban_date=None))
+    def get_all_active_ban_user_ids(cls) -> dict:
+        """Returns a dict of user_ids for all currently banned users"""
+        return {
+            user['user_id']: user['username']
+            for user in list(BanRecord.objects.filter(epoch_unban_date=None).values('user_id', 'username'))
+        }
 
     @classmethod
     @sync_to_async
-    def get_all_active_bans(cls) -> List[BanRecord]:
+    def get_all_active_bans(cls, search_query=None) -> List[BanRecord]:
         """Returns list of usernames and user_ids for all currently banned users"""
-
-        return list(BanRecord.objects.values('username', 'user_id').filter(unban_date=None))
+        bans = BanRecord.objects.filter(epoch_unban_date=None).order_by('-epoch_ban_date').values('username', 'user_id')
+        if search_query is not None:
+            bans = bans.filter(
+                Q(username__icontains=search_query) | Q(user_id__contains=search_query)
+            )
+        return list(bans)
 
     @classmethod
     @sync_to_async
     def get_active_bans_count(cls) -> int:
         """Returns count of all the active bans"""
 
-        return BanRecord.objects.filter(unban_date=None).count()
+        return BanRecord.objects.filter(epoch_unban_date=None).count()
 
     @classmethod
     @sync_to_async
     def unban_by_id(cls, user_id: int) -> str | None:
         """Set active=False for user with the given user_id. This represents unbanning a user."""
         try:
-            user = BanRecord.objects.get(user_id=user_id, unban_date=None)
+            user = BanRecord.objects.get(user_id=user_id, epoch_unban_date=None)
         except Exception:
             return None
 
-        user.unban_date = datetime.datetime.now().timestamp()
+        user.epoch_unban_date = datetime.datetime.now().timestamp()
         user.save()
         return user.username
 
@@ -91,10 +107,15 @@ class BanRecord(models.Model):
     def user_is_banned(cls, user_id) -> bool:
         return BanRecord.objects.all().filter(user_id=user_id).first() is not None
 
+    @classmethod
+    @sync_to_async
+    def get_unpurged_users(cls) -> List[BanRecord]:
+        return list(BanRecord.objects.all().filter(is_purged=False))
+
     def __str__(self) -> str:
         return f"ban_id=[{self.ban_id}] username=[{self.username}] user_id=[{self.user_id}] " \
-               f"mod=[{self.mod}] mod_id=[{self.mod_id}] date=[{self.ban_date}] reason=[{self.reason}]" \
-               f"unban_date=[{self.unban_date}]"
+               f"mod=[{self.mod}] mod_id=[{self.mod_id}] date=[{self.epoch_ban_date}] reason=[{self.reason}]" \
+               f"epoch_unban_date=[{self.epoch_unban_date}]"
 
 
 class CommandStat(models.Model):
