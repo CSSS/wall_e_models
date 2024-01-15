@@ -40,7 +40,7 @@ class BanRecord(models.Model):
     reason = models.CharField(max_length=512, null=False)
     epoch_unban_date = models.BigIntegerField(null=True, default=None)
     # unban_date = PSTDateTimeField(null=True, default=None)
-    is_purged = models.BooleanField(default=True) # need to be changed to False after first migration
+    is_purged = models.BooleanField(default=False) # need to be changed to False after first migration
     purge_window_days = models.IntegerField(default=1)
 
     class Meta:
