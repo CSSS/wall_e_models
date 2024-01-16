@@ -101,11 +101,6 @@ class BanRecord(models.Model):
 
     @classmethod
     @sync_to_async
-    def user_is_banned(cls, user_id) -> bool:
-        return BanRecord.objects.all().filter(user_id=user_id).first() is not None
-
-    @classmethod
-    @sync_to_async
     def get_unpurged_users(cls) -> List[BanRecord]:
         return list(BanRecord.objects.all().filter(is_purged=False))
 
