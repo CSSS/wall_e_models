@@ -25,7 +25,7 @@ class GeneratedIdentityField(models.AutoField):
 
     def __init__(self, *args, **kwargs):
 
-        # this is necessary because of the `always` that was used in the fourth migration
+        # this is necessary because of the `always` that was used in the fourth migrationf
         kwargs.pop('always', None)
 
         # have to do it like this cause otherwise loaddata will not work when loading datat from PROD,

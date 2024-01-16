@@ -33,10 +33,8 @@ class BanRecord(models.Model):
     user_id = models.BigIntegerField(null=False)
     mod = models.CharField(max_length=37, null=True)
     mod_id = models.BigIntegerField(null=True)
-    epoch_ban_date = models.BigIntegerField(null=True)
-    ban_date = PSTDateTimeField(null=True)  # set to default=timezone.now after first migration
+    ban_date = PSTDateTimeField(default=timezone.now, null=True)
     reason = models.CharField(max_length=512, null=False)
-    epoch_unban_date = models.BigIntegerField(null=True, default=None)
     unban_date = PSTDateTimeField(null=True, default=None)
     is_purged = models.BooleanField(default=False)
     purge_window_days = models.IntegerField(default=1)
@@ -44,7 +42,7 @@ class BanRecord(models.Model):
     class Meta:
         db_table = 'wall_e_models_ban_records'
         constraints = [
-            UniqueConstraint(fields=['user_id'], name='unique_active_ban', condition=Q(epoch_unban_date__isnull=True))
+            UniqueConstraint(fields=['user_id'], name='unique_active_ban', condition=Q(unban_date__isnull=True))
         ]
 
     @classmethod
@@ -52,17 +50,6 @@ class BanRecord(models.Model):
     def insert_records(cls, records: List[BanRecord]) -> None:
         """Adds entry to BanRecord table"""
         BanRecord.objects.bulk_create(records)
-
-    @classmethod
-    @sync_to_async
-    def update_date_format(cls) -> None:
-        records = BanRecord.objects.all()
-        for record in records:
-            if record.ban_date is None and record.epoch_ban_date:
-                record.ban_date = record.epoch_ban_date
-            if record.unban_date is None and record.epoch_unban_date:
-                record.unban_date = record.epoch_unban_date
-            record.save()
 
     @classmethod
     @sync_to_async
@@ -109,7 +96,6 @@ class BanRecord(models.Model):
             return None
 
         user.unban_date = pstdatetime.now().pst
-        user.epoch_unban_date = pstdatetime.now().pst.timestamp()
         user.save()
         return user.username
 
@@ -123,14 +109,6 @@ class BanRecord(models.Model):
     def get_unpurged_users(cls) -> List[BanRecord]:
         return list(BanRecord.objects.all().filter(is_purged=False))
 
-    @property
-    def get_ban_date(self):
-        return self.ban_date if self.ban_date else pstdatetime.from_epoch(self.epoch_ban_date)
-
-    @property
-    def get_unban_date(self):
-        return self.unban_date if self.unban_date else pstdatetime.from_epoch(self.epoch_unban_date)
-
     @classmethod
     @sync_to_async
     def marked_user_as_purged(cls, record_id):
@@ -140,8 +118,8 @@ class BanRecord(models.Model):
 
     def __str__(self) -> str:
         return f"ban_id=[{self.ban_id}] username=[{self.username}] user_id=[{self.user_id}] " \
-               f"mod=[{self.mod}] mod_id=[{self.mod_id}] date=[{self.get_ban_date}] reason=[{self.reason}]" \
-               f"unban_date=[{self.get_unban_date}]"
+               f"mod=[{self.mod}] mod_id=[{self.mod_id}] date=[{self.ban_date}] reason=[{self.reason}]" \
+               f"unban_date=[{self.unban_date}]"
 
 
 class CommandStat(models.Model):
