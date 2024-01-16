@@ -110,10 +110,6 @@ class pstdatetime(datetime.datetime):
         )
 
     @classmethod
-    def from_csv_epoch(cls, epoch_time: int):
-        return None if epoch_time == "" else cls.from_epoch(int(epoch_time))
-
-    @classmethod
     def from_epoch(cls, epoch_time: int):
         try:
             date = pstdatetime.fromtimestamp(epoch_time).astimezone(cls.UTC_TZ)
@@ -163,6 +159,12 @@ class pstdatetime(datetime.datetime):
                 year=year, month=month, day=day, hour_24=hour_24, minute=minute, second=second
             ).utc
 
+def isfloat(num):
+    try:
+        float(num)
+        return True
+    except (ValueError, TypeError):
+        return False
 
 class PSTDateTimeField(models.DateTimeField):
 
@@ -174,6 +176,9 @@ class PSTDateTimeField(models.DateTimeField):
         # date can be None cause of end date
         if type(date) == str and date.strip() == "":
             setattr(model_instance, self.attname, None)
+        elif f"{date}".isdigit() or (date and isfloat(date)):
+            date = pstdatetime.from_epoch(date)
+            setattr(model_instance, self.attname, date.utc)
         elif date is not None:
             if type(date) is str and re.match(r"\d{4}-\d{2}-\d{2}", date):
                 year = int(date[:4])

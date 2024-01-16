@@ -15,17 +15,15 @@ import pytz
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.db import models
-from django.db.models import Q, UniqueConstraint
+from django.db.models import Q, UniqueConstraint, F
 from django.forms import model_to_dict
 from django.utils import timezone
 from dateutil.tz import tz
 
-from .pstdatetime import PSTDateTimeField
-
 TIME_ZONE = 'Canada/Pacific'
 PACIFIC_TZ = tz.gettz(TIME_ZONE)
 
-from .customFields import GeneratedIdentityField  # noqa: E402
+from .customFields import GeneratedIdentityField, pstdatetime, PSTDateTimeField  # noqa: E402
 import requests  # noqa: E402
 
 
@@ -36,11 +34,11 @@ class BanRecord(models.Model):
     mod = models.CharField(max_length=37, null=True)
     mod_id = models.BigIntegerField(null=True)
     epoch_ban_date = models.BigIntegerField(null=True)
-    # ban_date = PSTDateTimeField(default=timezone.now)
+    ban_date = PSTDateTimeField(null=True)  # set to default=timezone.now after first migration
     reason = models.CharField(max_length=512, null=False)
     epoch_unban_date = models.BigIntegerField(null=True, default=None)
-    # unban_date = PSTDateTimeField(null=True, default=None)
-    is_purged = models.BooleanField(default=False) # need to be changed to False after first migration
+    unban_date = PSTDateTimeField(null=True, default=None)
+    is_purged = models.BooleanField(default=False)
     purge_window_days = models.IntegerField(default=1)
 
     class Meta:
@@ -57,6 +55,17 @@ class BanRecord(models.Model):
 
     @classmethod
     @sync_to_async
+    def update_date_format(cls) -> None:
+        records = BanRecord.objects.all()
+        for record in records:
+            if record.ban_date is None and record.epoch_ban_date:
+                record.ban_date = record.epoch_ban_date
+            if record.unban_date is None and record.epoch_unban_date:
+                record.unban_date = record.epoch_unban_date
+            record.save()
+
+    @classmethod
+    @sync_to_async
     def insert_record(cls, record: BanRecord) -> None:
         """Adds entry to BanRecord table"""
         record.save()
@@ -67,14 +76,16 @@ class BanRecord(models.Model):
         """Returns a dict of user_ids for all currently banned users"""
         return {
             user['user_id']: user['username']
-            for user in list(BanRecord.objects.filter(epoch_unban_date=None).values('user_id', 'username'))
+            for user in list(BanRecord.objects.filter(unban_date=None).values('user_id', 'username'))
         }
 
     @classmethod
     @sync_to_async
     def get_all_active_bans(cls, search_query=None) -> List[BanRecord]:
         """Returns list of usernames and user_ids for all currently banned users"""
-        bans = BanRecord.objects.filter(epoch_unban_date=None).order_by('-epoch_ban_date').values('username', 'user_id')
+        bans = BanRecord.objects.filter(unban_date=None).order_by(
+            F('ban_date').desc(nulls_last=True)
+        ).values('username', 'user_id', 'ban_date')
         if search_query is not None:
             bans = bans.filter(
                 Q(username__icontains=search_query) | Q(user_id__contains=search_query)
@@ -86,18 +97,19 @@ class BanRecord(models.Model):
     def get_active_bans_count(cls) -> int:
         """Returns count of all the active bans"""
 
-        return BanRecord.objects.filter(epoch_unban_date=None).count()
+        return BanRecord.objects.filter(unban_date=None).count()
 
     @classmethod
     @sync_to_async
     def unban_by_id(cls, user_id: int) -> str | None:
         """Set active=False for user with the given user_id. This represents unbanning a user."""
         try:
-            user = BanRecord.objects.get(user_id=user_id, epoch_unban_date=None)
+            user = BanRecord.objects.get(user_id=user_id, unban_date=None)
         except Exception:
             return None
 
-        user.epoch_unban_date = datetime.datetime.now().timestamp()
+        user.unban_date = pstdatetime.now().pst
+        user.epoch_unban_date = pstdatetime.now().pst.timestamp()
         user.save()
         return user.username
 
@@ -111,10 +123,25 @@ class BanRecord(models.Model):
     def get_unpurged_users(cls) -> List[BanRecord]:
         return list(BanRecord.objects.all().filter(is_purged=False))
 
+    @property
+    def get_ban_date(self):
+        return self.ban_date if self.ban_date else pstdatetime.from_epoch(self.epoch_ban_date)
+
+    @property
+    def get_unban_date(self):
+        return self.unban_date if self.unban_date else pstdatetime.from_epoch(self.epoch_unban_date)
+
+    @classmethod
+    @sync_to_async
+    def marked_user_as_purged(cls, record_id):
+        record_obj = BanRecord.objects.get(ban_id=record_id)
+        record_obj.is_purged = True
+        record_obj.save()
+
     def __str__(self) -> str:
         return f"ban_id=[{self.ban_id}] username=[{self.username}] user_id=[{self.user_id}] " \
-               f"mod=[{self.mod}] mod_id=[{self.mod_id}] date=[{self.epoch_ban_date}] reason=[{self.reason}]" \
-               f"epoch_unban_date=[{self.epoch_unban_date}]"
+               f"mod=[{self.mod}] mod_id=[{self.mod_id}] date=[{self.get_ban_date}] reason=[{self.reason}]" \
+               f"unban_date=[{self.get_unban_date}]"
 
 
 class CommandStat(models.Model):
@@ -340,8 +367,8 @@ class UserPoint(models.Model):
             if user.user_id != self.user_id:
                 users_above_in_rank.append(user)
             else:
-                return len(users_above_in_rank)+1
-        return len(users_above_in_rank)+1
+                return len(users_above_in_rank) + 1
+        return len(users_above_in_rank) + 1
 
     @sync_to_async
     def get_xp_needed_to_level_up_to_next_level(self):
@@ -671,7 +698,7 @@ class HelpMessage(models.Model):
 
     def save(self, *args, **kwargs):
         self.help_message_expiration_date = (
-            convert_utc_time_to_pacific(datetime.datetime.now()) + datetime.timedelta(minutes=1)
+                convert_utc_time_to_pacific(datetime.datetime.now()) + datetime.timedelta(minutes=1)
         ).timestamp()
         super(HelpMessage, self).save(*args, **kwargs)
 
