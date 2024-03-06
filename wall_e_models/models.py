@@ -388,9 +388,9 @@ class UserPoint(models.Model):
                 avatar_link_changed = False
                 leveling_message_avatar_url = None
                 if not avatar_changed:
-                    leveling_message_avatar_url = await levelling_website_avatar_channel.fetch_message(
+                    leveling_message_avatar_url = (await levelling_website_avatar_channel.fetch_message(
                         self.avatar_url_message_id
-                    ).attachments[0].url
+                    )).attachments[0].url
                     avatar_link_changed = self.leveling_message_avatar_url != leveling_message_avatar_url
                 name_changed = self.name != member.name
                 number_of_changes = 0
