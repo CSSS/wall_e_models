@@ -383,12 +383,23 @@ class UserPoint(models.Model):
             try:
                 self.leveling_update_attempt += 1
                 changes_detected = ""
+
                 avatar_changed = self.avatar_url != member.display_avatar.url
+                avatar_link_changed = False
+                leveling_message_avatar_url = None
+                if not avatar_changed:
+                    leveling_message_avatar_url = await levelling_website_avatar_channel.fetch_message(
+                        self.avatar_url_message_id
+                    ).attachments[0].url
+                    avatar_link_changed = self.leveling_message_avatar_url != leveling_message_avatar_url
                 name_changed = self.name != member.name
                 number_of_changes = 0
                 if avatar_changed:
                     number_of_changes += 1
                     changes_detected = "avatar"
+                elif avatar_link_changed:
+                    number_of_changes += 1
+                    changes_detected = 'avatar link'
                 if type(member) == discord.Member:  # necessary because if the user is no longer in the Guild,
                     # then they don't have a nickname on it
                     if self.nickname != member.nick:
@@ -422,6 +433,8 @@ class UserPoint(models.Model):
                     self.avatar_url = member.display_avatar.url
                     self.leveling_message_avatar_url = avatar_msg.attachments[0].url
                     self.avatar_url_message_id = avatar_msg.id
+                elif avatar_link_changed:
+                    self.leveling_message_avatar_url = leveling_message_avatar_url
                 if number_of_changes > 0:
                     logger.debug(
                         f"[wall_e_models models.py update_leveling_profile_info()] detected {changes_detected}"
