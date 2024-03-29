@@ -375,15 +375,17 @@ class UserPoint(models.Model):
     def get_users_that_need_leveling_info_updated(bucket_number):
         current_date = pstdatetime.now()
         query = UserPoint.objects.all().filter(
-            Q(bucket_number=bucket_number) | Q(discord_avatar_link_expiry_date>=current_date)
+            Q(bucket_number=bucket_number) | Q(discord_avatar_link_expiry_date__gte=current_date)
         ).order_by('-points')
+
         return list(query.values_list('user_id', flat=True))
 
     def set_avatar_link_expiry_date(self):
         url = self.leveling_message_avatar_url
         query_params = {
-            query_params[:query_params.index("=")]: query_params[query_params.index("=") + 1:]
-            for query_params in url[url.index("?") + 1:].split("&")
+            query_param[:query_param.find("=")]: query_param[query_param.find("=") + 1:]
+            for query_param in url[url.index("?") + 1:].split("&")
+            if query_param.find("=") != -1
         }
         self.discord_avatar_link_expiry_date = pstdatetime.from_utc_datetime(
             datetime.datetime.utcfromtimestamp(eval("0x" + query_params['ex'].strip()))
