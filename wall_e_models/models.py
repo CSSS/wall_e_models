@@ -478,7 +478,7 @@ class UserPoint(models.Model):
                     with open(avatar_file_name, "wb") as file:
                         file.write(requests.get(member.display_avatar.url).content)
                     avatar_msg = await levelling_website_avatar_channel.send(
-                        file=discord.File(avatar_file_name)
+                        content=f"<@{member.id}>", file=discord.File(avatar_file_name)
                     )
                     os.remove(avatar_file_name)
                     self.avatar_url = member.display_avatar.url
