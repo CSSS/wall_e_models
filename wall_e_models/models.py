@@ -461,14 +461,17 @@ class UserPoint(models.Model):
                     number_of_changes += 1
                 if avatar_changed:
                     if self.avatar_url_message_id is not None:
-                        avatar_msg = await levelling_website_avatar_channel.fetch_message(
-                            self.avatar_url_message_id
-                        )
-                        await avatar_msg.delete()
-                        logger.debug(
-                            f"[wall_e_models models.py update_leveling_profile_info()] deleted old avatar message for "
-                            f"member {member}"
-                        )
+                        try:
+                            avatar_msg = await levelling_website_avatar_channel.fetch_message(
+                                self.avatar_url_message_id
+                            )
+                            await avatar_msg.delete()
+                            logger.debug(
+                                f"[wall_e_models models.py update_leveling_profile_info()] deleted old avatar message"
+                                f" for member {member}"
+                            )
+                        except discord.NotFound:
+                            pass
                     with open(avatar_file_name, "wb") as file:
                         file.write(requests.get(member.display_avatar.url).content)
                     avatar_msg = await levelling_website_avatar_channel.send(
