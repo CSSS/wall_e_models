@@ -380,15 +380,21 @@ class UserPoint(models.Model):
 
         return list(query.values_list('user_id', flat=True))
 
-    def set_avatar_link_expiry_date(self):
+    def set_avatar_link_expiry_date(self, logger):
         url = self.leveling_message_avatar_url
+        logger.debug(f"[wall_e_models models.py set_avatar_link_expiry_date()] url = {url}")
         query_params = {
             query_param[:query_param.find("=")]: query_param[query_param.find("=") + 1:]
             for query_param in url[url.index("?") + 1:].split("&")
             if query_param.find("=") != -1
         }
+        logger.debug(f"[wall_e_models models.py set_avatar_link_expiry_date()] query_params = {query_params}")
         self.discord_avatar_link_expiry_date = pstdatetime.from_utc_datetime(
             datetime.datetime.utcfromtimestamp(eval("0x" + query_params['ex'].strip()))
+        )
+        logger.debug(
+            f"[wall_e_models models.py set_avatar_link_expiry_date()] discord_avatar_link_expiry_date = "
+            f"{self.discord_avatar_link_expiry_date}"
         )
 
     async def update_leveling_profile_info(self, logger, member, levelling_website_avatar_channel,
@@ -404,13 +410,32 @@ class UserPoint(models.Model):
                 avatar_changed = self.avatar_url != member.display_avatar.url
                 avatar_link_changed = False
                 leveling_message_avatar_url = None
+                logger.debug(
+                    f"[wall_e_models models.py update_leveling_profile_info()] avatar_changed = {avatar_changed}"
+                )
                 if not avatar_changed:
                     leveling_message_avatar_url = (await levelling_website_avatar_channel.fetch_message(
                         self.avatar_url_message_id
                     )).attachments[0].url
+                    logger.debug(
+                        f"[wall_e_models models.py update_leveling_profile_info()] leveling_message_avatar_url = "
+                        f"{leveling_message_avatar_url}"
+                    )
                     avatar_link_changed = self.leveling_message_avatar_url != leveling_message_avatar_url
+                    logger.debug(
+                        f"[wall_e_models models.py update_leveling_profile_info()] avatar_link_changed = "
+                        f"{avatar_link_changed}"
+                    )
+                logger.debug(
+                    f"[wall_e_models models.py update_leveling_profile_info()] avatar_changed = {avatar_changed} && "
+                    f"avatar_link_changed = {avatar_link_changed}"
+                )
                 if not avatar_changed and not avatar_link_changed:
                     if pstdatetime.now() >= self.discord_avatar_link_expiry_date:
+                        logger.debug(
+                            f"[wall_e_models models.py update_leveling_profile_info()] {member}'s avatar CDN link has"
+                            f" expired"
+                        )
                         avatar_link_changed = True
                 name_changed = self.name != member.name
                 number_of_changes = 0
@@ -452,11 +477,11 @@ class UserPoint(models.Model):
                     os.remove(avatar_file_name)
                     self.avatar_url = member.display_avatar.url
                     self.leveling_message_avatar_url = avatar_msg.attachments[0].url
-                    self.set_avatar_link_expiry_date()
+                    self.set_avatar_link_expiry_date(logger)
                     self.avatar_url_message_id = avatar_msg.id
                 elif avatar_link_changed:
                     self.leveling_message_avatar_url = leveling_message_avatar_url
-                    self.set_avatar_link_expiry_date()
+                    self.set_avatar_link_expiry_date(logger)
                 if number_of_changes > 0:
                     logger.debug(
                         f"[wall_e_models models.py update_leveling_profile_info()] detected {changes_detected}"
