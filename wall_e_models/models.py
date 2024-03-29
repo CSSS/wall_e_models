@@ -375,7 +375,7 @@ class UserPoint(models.Model):
     def get_users_that_need_leveling_info_updated(bucket_number):
         current_date = pstdatetime.now()
         query = UserPoint.objects.all().filter(
-            Q(bucket_number=bucket_number) | Q(discord_avatar_link_expiry_date__gte=current_date)
+            Q(bucket_number=bucket_number) | Q(discord_avatar_link_expiry_date__lte=current_date)
         ).order_by('-points')
 
         return list(query.values_list('user_id', flat=True))
