@@ -373,11 +373,7 @@ class UserPoint(models.Model):
     @staticmethod
     @sync_to_async
     def get_users_that_need_leveling_info_updated(bucket_number):
-        current_date = pstdatetime.now()
-        query = UserPoint.objects.all().filter(
-            Q(bucket_number=bucket_number) | Q(discord_avatar_link_expiry_date__lte=current_date)
-        ).order_by('-points')
-
+        query = UserPoint.objects.all().filter(bucket_number=bucket_number).order_by('-points')
         return list(query.values_list('user_id', flat=True))
 
     def set_avatar_link_expiry_date(self, logger):
