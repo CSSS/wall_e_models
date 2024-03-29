@@ -420,7 +420,7 @@ class UserPoint(models.Model):
                         )).attachments[0].url
                         logger.debug(
                             f"[wall_e_models models.py update_leveling_profile_info()] leveling_message_avatar_url = "
-                            f"{leveling_message_avatar_url}"
+                            f"<{leveling_message_avatar_url}>"
                         )
                         avatar_link_changed = self.leveling_message_avatar_url != leveling_message_avatar_url
                         logger.debug(
