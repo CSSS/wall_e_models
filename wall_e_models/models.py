@@ -283,6 +283,8 @@ class UserPoint(models.Model):
         null=True
     )
 
+    discord_avatar_link_expiry_date =  PSTDateTimeField(default=timezone.now, null=True)
+
     @sync_to_async
     def async_save(self):
         self.save()
@@ -371,8 +373,21 @@ class UserPoint(models.Model):
     @staticmethod
     @sync_to_async
     def get_users_that_need_leveling_info_updated(bucket_number):
-        query = UserPoint.objects.all().filter(bucket_number=bucket_number).order_by('-points')
+        current_date = pstdatetime.now()
+        query = UserPoint.objects.all().filter(
+            Q(bucket_number=bucket_number) | Q(discord_avatar_link_expiry_date>=current_date)
+        ).order_by('-points')
         return list(query.values_list('user_id', flat=True))
+
+    def set_avatar_link_expiry_date(self):
+        url = self.leveling_message_avatar_url
+        query_params = {
+            query_params[:query_params.index("=")]: query_params[query_params.index("=") + 1:]
+            for query_params in url[url.index("?") + 1:].split("&")
+        }
+        self.discord_avatar_link_expiry_date = pstdatetime.from_utc_datetime(
+            datetime.datetime.utcfromtimestamp(eval("0x" + query_params['ex'].strip()))
+        )
 
     async def update_leveling_profile_info(self, logger, member, levelling_website_avatar_channel,
                                            updated_user_log_id=None):
@@ -392,6 +407,9 @@ class UserPoint(models.Model):
                         self.avatar_url_message_id
                     )).attachments[0].url
                     avatar_link_changed = self.leveling_message_avatar_url != leveling_message_avatar_url
+                if not avatar_changed and not avatar_link_changed:
+                    if pstdatetime.now() >= self.discord_avatar_link_expiry_date:
+                        avatar_link_changed = True
                 name_changed = self.name != member.name
                 number_of_changes = 0
                 if avatar_changed:
@@ -432,9 +450,11 @@ class UserPoint(models.Model):
                     os.remove(avatar_file_name)
                     self.avatar_url = member.display_avatar.url
                     self.leveling_message_avatar_url = avatar_msg.attachments[0].url
+                    self.set_avatar_link_expiry_date()
                     self.avatar_url_message_id = avatar_msg.id
                 elif avatar_link_changed:
                     self.leveling_message_avatar_url = leveling_message_avatar_url
+                    self.set_avatar_link_expiry_date()
                 if number_of_changes > 0:
                     logger.debug(
                         f"[wall_e_models models.py update_leveling_profile_info()] detected {changes_detected}"
