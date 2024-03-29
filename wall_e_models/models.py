@@ -283,7 +283,7 @@ class UserPoint(models.Model):
         null=True
     )
 
-    discord_avatar_link_expiry_date =  PSTDateTimeField(default=timezone.now, null=True)
+    discord_avatar_link_expiry_date = PSTDateTimeField(default=timezone.now, null=True)
 
     @sync_to_async
     def async_save(self):
@@ -414,18 +414,21 @@ class UserPoint(models.Model):
                     f"[wall_e_models models.py update_leveling_profile_info()] avatar_changed = {avatar_changed}"
                 )
                 if not avatar_changed:
-                    leveling_message_avatar_url = (await levelling_website_avatar_channel.fetch_message(
-                        self.avatar_url_message_id
-                    )).attachments[0].url
-                    logger.debug(
-                        f"[wall_e_models models.py update_leveling_profile_info()] leveling_message_avatar_url = "
-                        f"{leveling_message_avatar_url}"
-                    )
-                    avatar_link_changed = self.leveling_message_avatar_url != leveling_message_avatar_url
-                    logger.debug(
-                        f"[wall_e_models models.py update_leveling_profile_info()] avatar_link_changed = "
-                        f"{avatar_link_changed}"
-                    )
+                    try:
+                        leveling_message_avatar_url = (await levelling_website_avatar_channel.fetch_message(
+                            self.avatar_url_message_id
+                        )).attachments[0].url
+                        logger.debug(
+                            f"[wall_e_models models.py update_leveling_profile_info()] leveling_message_avatar_url = "
+                            f"{leveling_message_avatar_url}"
+                        )
+                        avatar_link_changed = self.leveling_message_avatar_url != leveling_message_avatar_url
+                        logger.debug(
+                            f"[wall_e_models models.py update_leveling_profile_info()] avatar_link_changed = "
+                            f"{avatar_link_changed}"
+                        )
+                    except discord.NotFound:
+                        avatar_link_changed = True
                 logger.debug(
                     f"[wall_e_models models.py update_leveling_profile_info()] avatar_changed = {avatar_changed} && "
                     f"avatar_link_changed = {avatar_link_changed}"
