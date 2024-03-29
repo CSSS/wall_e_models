@@ -428,7 +428,7 @@ class UserPoint(models.Model):
                             f"{avatar_link_changed}"
                         )
                     except discord.NotFound:
-                        avatar_link_changed = True
+                        avatar_changed = True
                 logger.debug(
                     f"[wall_e_models models.py update_leveling_profile_info()] avatar_changed = {avatar_changed} && "
                     f"avatar_link_changed = {avatar_link_changed}"
