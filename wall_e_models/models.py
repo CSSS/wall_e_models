@@ -382,7 +382,7 @@ class UserPoint(models.Model):
 
     def set_avatar_link_expiry_date(self, logger):
         url = self.leveling_message_avatar_url
-        logger.debug(f"[wall_e_models models.py set_avatar_link_expiry_date()] url = {url}")
+        logger.debug(f"[wall_e_models models.py set_avatar_link_expiry_date()] url = <{url}>")
         query_params = {
             query_param[:query_param.find("=")]: query_param[query_param.find("=") + 1:]
             for query_param in url[url.index("?") + 1:].split("&")
