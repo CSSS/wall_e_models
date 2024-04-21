@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import os
 import re
 import time
@@ -401,7 +402,7 @@ class UserPoint(models.Model):
             avatar_file_name = f'levelling-avatar-{file_name_friendly_member_name}-{time.time()}.png'.replace(" ", "-")
 
             avatar_file_name = avatar_file_name.replace(">", "").replace("_", "-")
-            # removing > as just that alone can break url rendering in discord
+            # removing > as just that alone can break url rendering in discord [for obvious reasons]
             # also removing _ as _ followed by any special character can also break url rendering in discord
             try:
                 self.leveling_update_attempt += 1
@@ -414,21 +415,41 @@ class UserPoint(models.Model):
                     f"[wall_e_models models.py update_leveling_profile_info()] avatar_changed = {avatar_changed}"
                 )
                 if not avatar_changed:
-                    try:
-                        leveling_message_avatar_url = (await levelling_website_avatar_channel.fetch_message(
-                            self.avatar_url_message_id
-                        )).attachments[0].url
-                        logger.debug(
-                            f"[wall_e_models models.py update_leveling_profile_info()] leveling_message_avatar_url = "
-                            f"<{leveling_message_avatar_url}>"
-                        )
-                        avatar_link_changed = self.leveling_message_avatar_url != leveling_message_avatar_url
-                        logger.debug(
-                            f"[wall_e_models models.py update_leveling_profile_info()] avatar_link_changed = "
-                            f"{avatar_link_changed}"
-                        )
-                    except discord.NotFound:
-                        avatar_changed = True
+                    number_of_attempts = 0
+                    total_number_of_attempts = 5
+                    attempt_avatar_link_retrieval = True
+                    while number_of_attempts <= total_number_of_attempts and attempt_avatar_link_retrieval:
+                        number_of_attempts += 1
+                        try:
+                            leveling_message_avatar_url = (await levelling_website_avatar_channel.fetch_message(
+                                self.avatar_url_message_id
+                            )).attachments[0].url
+                            logger.debug(
+                                f"[wall_e_models models.py update_leveling_profile_info()] leveling_message_avatar_url "
+                                f"= <{leveling_message_avatar_url}>"
+                            )
+                            avatar_link_changed = self.leveling_message_avatar_url != leveling_message_avatar_url
+                            logger.debug(
+                                f"[wall_e_models models.py update_leveling_profile_info()] avatar_link_changed = "
+                                f"{avatar_link_changed}"
+                            )
+                            attempt_avatar_link_retrieval = False
+                        except discord.NotFound:
+                            avatar_changed = True
+                            attempt_avatar_link_retrieval = False
+                        except Exception as e:
+                            if number_of_attempts == total_number_of_attempts:
+                                raise e
+                            waitTime = math.pow(2, number_of_attempts)
+                            logger.debug(
+                                f"[wall_e_models models.py update_leveling_profile_info()] sleeping for {waitTime}"
+                                f" seconds"
+                            )
+                            await asyncio.sleep(waitTime)
+                            logger.error(
+                                f"[wall_e_models models.py update_leveling_profile_info()] experienced error trying to "
+                                f"fetch the message with the avatar\n.{e}"
+                            )
                 logger.debug(
                     f"[wall_e_models models.py update_leveling_profile_info()] avatar_changed = {avatar_changed} && "
                     f"avatar_link_changed = {avatar_link_changed}"
