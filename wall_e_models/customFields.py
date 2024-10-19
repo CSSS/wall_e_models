@@ -7,14 +7,13 @@ from django.db import models
 from django.conf import settings
 
 ENV = getattr(settings, "ENVIRONMENT", "LOCALHOST")
-database_type = getattr(settings, "database_type", "sqlite3")
 
 try:
     # necessary if this is being called from wall_e and therefore the settings need to be picked up from
     # django_settings instead of the settings file in the wall_e_models repo
     import django_settings
+
     ENV = getattr(django_settings, "ENVIRONMENT", "LOCALHOST")
-    database_type = getattr(django_settings, "database_type", "sqlite3")
 except ModuleNotFoundError:
     pass
 
@@ -42,18 +41,8 @@ class GeneratedIdentityField(models.AutoField):
         return name, path, args, kwargs
 
     def db_type(self, connection):
-        if database_type == "postgreSQL":
-            return f"INTEGER GENERATED {'ALWAYS' if self.always else 'BY DEFAULT'} AS IDENTITY"
-        else:
-            # migration 4 gives this error unless the db_type is just INTEGER
-            #   File "python3.9/site-packages/django/db/backends/utils.py", line 82, in _execute
-            #     return self.cursor.execute(sql)
-            #   File "python3.9/site-packages/django/db/backends/sqlite3/base.py", line 421, in execute
-            #     return Database.Cursor.execute(self, query)
-            # sqlite3.OperationalError: near "AS": syntax error
-            return "INTEGER"
-            # apparently, sqlite3 automatically set the definition of the field to
-            # INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT
+        return "INTEGER"
+
 
 class pstdatetime(datetime.datetime):
     """
