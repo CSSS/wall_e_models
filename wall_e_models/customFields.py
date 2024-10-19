@@ -23,7 +23,6 @@ class GeneratedIdentityField(models.AutoField):
                   A modern alternative to `BIGSERIAL` from the SQL standard."
 
     def __init__(self, *args, **kwargs):
-
         # this is necessary because of the `always` that was used in the fourth migrationf
         kwargs.pop('always', None)
 
@@ -104,7 +103,7 @@ class pstdatetime(datetime.datetime):
             date = pstdatetime.fromtimestamp(epoch_time).astimezone(cls.UTC_TZ)
         except ValueError:
             date = pstdatetime.fromtimestamp(
-                int(epoch_time)//1000
+                int(epoch_time) // 1000
             ).replace(microsecond=int(epoch_time) % 1000 * 10).astimezone(cls.UTC_TZ)
         return date.pst
 
@@ -145,8 +144,9 @@ class pstdatetime(datetime.datetime):
         datetime -- the UTC timezone object
         """
         return cls.create_pst_time(
-                year=year, month=month, day=day, hour_24=hour_24, minute=minute, second=second
-            ).utc
+            year=year, month=month, day=day, hour_24=hour_24, minute=minute, second=second
+        ).utc
+
 
 def isfloat(num):
     try:
@@ -154,6 +154,7 @@ def isfloat(num):
         return True
     except (ValueError, TypeError):
         return False
+
 
 class PSTDateTimeField(models.DateTimeField):
 
