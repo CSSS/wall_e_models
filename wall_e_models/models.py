@@ -3,33 +3,33 @@
 from __future__ import annotations
 
 import asyncio
+import datetime
 import math
 import os
+import random
 import re
 import time
 from typing import List
-import datetime
-import random
 
 import discord
 import pytz
 from asgiref.sync import sync_to_async
+from dateutil.tz import tz
 from django.conf import settings
 from django.db import models
 from django.db.models import Q, UniqueConstraint, F
 from django.forms import model_to_dict
 from django.utils import timezone
-from dateutil.tz import tz
 
 TIME_ZONE = 'Canada/Pacific'
 PACIFIC_TZ = tz.gettz(TIME_ZONE)
 
-from .customFields import GeneratedIdentityField, pstdatetime, PSTDateTimeField  # noqa: E402
+from .customFields import pstdatetime, PSTDateTimeField  # noqa: E402
 import requests  # noqa: E402
 
 
 class BanRecord(models.Model):
-    ban_id = GeneratedIdentityField(primary_key=True)
+    ban_id = models.BigAutoField(primary_key=True)
     username = models.CharField(max_length=37, null=False)
     user_id = models.BigIntegerField(null=False)
     mod = models.CharField(max_length=37, null=True)

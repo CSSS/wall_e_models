@@ -4,44 +4,6 @@ import re
 import pytz
 from dateutil.tz import tz, tzfile
 from django.db import models
-from django.conf import settings
-
-ENV = getattr(settings, "ENVIRONMENT", "LOCALHOST")
-
-try:
-    # necessary if this is being called from wall_e and therefore the settings need to be picked up from
-    # django_settings instead of the settings file in the wall_e_models repo
-    import django_settings
-
-    ENV = getattr(django_settings, "ENVIRONMENT", "LOCALHOST")
-except ModuleNotFoundError:
-    pass
-
-
-class GeneratedIdentityField(models.AutoField):
-    description = "An Integer column which uses `GENERATED {ALWAYS | BY DEFAULT} AS IDENTITY`. \
-                  A modern alternative to `BIGSERIAL` from the SQL standard."
-
-    def __init__(self, *args, **kwargs):
-        # this is necessary because of the `always` that was used in the fourth migrationf
-        kwargs.pop('always', None)
-
-        # have to do it like this cause otherwise loaddata will not work when loading datat from PROD,
-        # you wind up with the error
-        # DETAIL:  Column "ban_id" is an identity column defined as GENERATED ALWAYS.
-        # HINT:  Use OVERRIDING SYSTEM VALUE to override.
-        self.always = ENV == "PRODUCTION"
-
-        super(GeneratedIdentityField, self).__init__(*args, **kwargs)
-
-    def deconstruct(self):
-        name, path, args, kwargs = super().deconstruct()
-        kwargs['always'] = self.always
-        return name, path, args, kwargs
-
-    def db_type(self, connection):
-        return "INTEGER"
-
 
 class pstdatetime(datetime.datetime):
     """
