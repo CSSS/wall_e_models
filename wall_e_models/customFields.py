@@ -5,6 +5,13 @@ import pytz
 from dateutil.tz import tz, tzfile
 from django.db import models
 
+
+class GeneratedIdentityField(models.AutoField):
+    """
+    just here to make sure that the migrations 0004_auto_20220206_1142.py and 0005_auto_20220715_1532.py work
+    """
+    pass
+
 class pstdatetime(datetime.datetime):
     """
     Create a pstdatetime object representing current object
