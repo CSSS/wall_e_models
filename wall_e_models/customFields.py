@@ -7,13 +7,20 @@ from django.db import models
 
 
 class GeneratedIdentityField(models.AutoField):
-    """
-    just here to make sure that the migrations 0004_auto_20220206_1142.py and 0005_auto_20220715_1532.py work
-    """
     def __init__(self, *args, **kwargs):
         # this is necessary because of the `always` that was used in the fourth migration
         kwargs.pop('always', None)
+        self.always = True
         super(GeneratedIdentityField, self).__init__(*args, **kwargs)
+
+    def deconstruct(self):
+        name, path, args, kwargs = super().deconstruct()
+        kwargs['always'] = self.always
+        return name, path, args, kwargs
+
+    def db_type(self, connection):
+        return "INTEGER"
+
 
 class pstdatetime(datetime.datetime):
     """

@@ -24,12 +24,12 @@ from django.utils import timezone
 TIME_ZONE = 'Canada/Pacific'
 PACIFIC_TZ = tz.gettz(TIME_ZONE)
 
-from .customFields import pstdatetime, PSTDateTimeField  # noqa: E402
+from .customFields import pstdatetime, PSTDateTimeField, GeneratedIdentityField  # noqa: E402
 import requests  # noqa: E402
 
 
 class BanRecord(models.Model):
-    ban_id = models.BigAutoField(primary_key=True)
+    ban_id = GeneratedIdentityField(primary_key=True)
     username = models.CharField(max_length=37, null=False)
     user_id = models.BigIntegerField(null=False)
     mod = models.CharField(max_length=37, null=True)
