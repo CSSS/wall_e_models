@@ -10,7 +10,10 @@ class GeneratedIdentityField(models.AutoField):
     """
     just here to make sure that the migrations 0004_auto_20220206_1142.py and 0005_auto_20220715_1532.py work
     """
-    pass
+    def __init__(self, *args, **kwargs):
+        # this is necessary because of the `always` that was used in the fourth migration
+        kwargs.pop('always', None)
+        super(GeneratedIdentityField, self).__init__(*args, **kwargs)
 
 class pstdatetime(datetime.datetime):
     """
