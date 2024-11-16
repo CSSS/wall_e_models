@@ -419,34 +419,35 @@ class UserPoint(models.Model):
                 self.leveling_update_attempt += 1
                 changes_detected = ""
 
-                avatar_changed = self.avatar_url != member.display_avatar.url
-                avatar_link_changed = False
-                leveling_message_avatar_url = None
+                member_display_avatar_url_changed = self.avatar_url != member.display_avatar.url
+                avatar_cdn_link_changed = False
+                leveling_message_avatar_cdn_url = None
                 logger.debug(
-                    f"[wall_e_models models.py update_leveling_profile_info()] avatar_changed = {avatar_changed}"
+                    f"[wall_e_models models.py update_leveling_profile_info()] member_display_avatar_url_changed = "
+                    f"{member_display_avatar_url_changed}"
                 )
-                if not avatar_changed:
+                if not member_display_avatar_url_changed:
                     number_of_attempts = 0
                     total_number_of_attempts = 5
                     attempt_avatar_link_retrieval = True
                     while number_of_attempts <= total_number_of_attempts and attempt_avatar_link_retrieval:
                         number_of_attempts += 1
                         try:
-                            leveling_message_avatar_url = (await levelling_website_avatar_channel.fetch_message(
+                            leveling_message_avatar_cdn_url = (await levelling_website_avatar_channel.fetch_message(
                                 self.avatar_url_message_id
                             )).attachments[0].url
                             logger.debug(
-                                f"[wall_e_models models.py update_leveling_profile_info()] leveling_message_avatar_url "
-                                f"= <{leveling_message_avatar_url}>"
+                                f"[wall_e_models models.py update_leveling_profile_info()] "
+                                f"leveling_message_avatar_cdn_url = <{leveling_message_avatar_cdn_url}>"
                             )
-                            avatar_link_changed = self.leveling_message_avatar_url != leveling_message_avatar_url
+                            avatar_cdn_link_changed = self.leveling_message_avatar_url != leveling_message_avatar_cdn_url
                             logger.debug(
-                                f"[wall_e_models models.py update_leveling_profile_info()] avatar_link_changed = "
-                                f"{avatar_link_changed}"
+                                f"[wall_e_models models.py update_leveling_profile_info()] avatar_cdn_link_changed = "
+                                f"{avatar_cdn_link_changed}"
                             )
                             attempt_avatar_link_retrieval = False
                         except discord.NotFound:
-                            avatar_changed = True
+                            member_display_avatar_url_changed = True
                             attempt_avatar_link_retrieval = False
                         except Exception as e:
                             if number_of_attempts == total_number_of_attempts:
@@ -462,27 +463,35 @@ class UserPoint(models.Model):
                                 f"fetch the message with the avatar\n.{e}"
                             )
                 logger.debug(
-                    f"[wall_e_models models.py update_leveling_profile_info()] avatar_changed = {avatar_changed} && "
-                    f"avatar_link_changed = {avatar_link_changed}"
+                    f"[wall_e_models models.py update_leveling_profile_info()] member_display_avatar_url_changed = "
+                    f"{member_display_avatar_url_changed} && "
+                    f"avatar_cdn_link_changed = {avatar_cdn_link_changed}"
                 )
-                if not avatar_changed and not avatar_link_changed:
+                if not member_display_avatar_url_changed and not avatar_cdn_link_changed:
                     if pstdatetime.now() >= self.discord_avatar_link_expiry_date:
                         logger.debug(
                             f"[wall_e_models models.py update_leveling_profile_info()] {member}'s avatar CDN link has"
                             f" expired"
                         )
-                        avatar_link_changed = True
+                        avatar_cdn_link_changed = True
                 name_changed = self.name != member.name
                 number_of_changes = 0
-                if avatar_changed:
+                if member_display_avatar_url_changed:
                     number_of_changes += 1
                     changes_detected = "avatar"
-                elif avatar_link_changed:
+                elif avatar_cdn_link_changed:
                     number_of_changes += 1
-                    changes_detected = 'avatar link'
+                    changes_detected = 'avatar CDN link'
+
                 if type(member) == discord.Member:  # necessary because if the user is no longer in the Guild,
-                    # then they don't have a nickname on it
+                        # then they don't have a nickname on it
                     if self.nickname != member.nick:
+                        number_of_changes += 1
+                        if changes_detected:
+                            changes_detected += ", " if name_changed else " and "
+                        changes_detected += "nickname"
+                else:
+                    if self.nickname is not None:
                         number_of_changes += 1
                         if changes_detected:
                             changes_detected += ", " if name_changed else " and "
@@ -494,7 +503,9 @@ class UserPoint(models.Model):
                         changes_detected += " and "
                     changes_detected += "name"
                     number_of_changes += 1
-                if avatar_changed:
+
+                message = f"{member.name}\n<@{member.id}>"
+                if member_display_avatar_url_changed:
                     if self.avatar_url_message_id is not None:
                         try:
                             avatar_msg = await levelling_website_avatar_channel.fetch_message(
@@ -510,16 +521,29 @@ class UserPoint(models.Model):
                     with open(avatar_file_name, "wb") as file:
                         file.write(requests.get(member.display_avatar.url).content)
                     avatar_msg = await levelling_website_avatar_channel.send(
-                        content=f"<@{member.id}>", file=discord.File(avatar_file_name)
+                        content=message, file=discord.File(avatar_file_name)
                     )
                     os.remove(avatar_file_name)
                     self.avatar_url = member.display_avatar.url
                     self.leveling_message_avatar_url = avatar_msg.attachments[0].url
                     self.set_avatar_link_expiry_date(logger)
                     self.avatar_url_message_id = avatar_msg.id
-                elif avatar_link_changed:
-                    self.leveling_message_avatar_url = leveling_message_avatar_url
-                    self.set_avatar_link_expiry_date(logger)
+                else:
+                    if name_changed and self.avatar_url_message_id is not None:
+                        try:
+                            avatar_msg = await levelling_website_avatar_channel.fetch_message(
+                                self.avatar_url_message_id
+                            )
+                            logger.debug(
+                                f"[wall_e_models models.py update_leveling_profile_info()] deleted old avatar message"
+                                f" for member {member}"
+                            )
+                            await avatar_msg.edit(content=message)
+                        except discord.NotFound:
+                            pass
+                    if avatar_cdn_link_changed:
+                        self.leveling_message_avatar_url = leveling_message_avatar_cdn_url
+                        self.set_avatar_link_expiry_date(logger)
                 if number_of_changes > 0:
                     logger.debug(
                         f"[wall_e_models models.py update_leveling_profile_info()] detected {changes_detected}"
