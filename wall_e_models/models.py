@@ -373,8 +373,19 @@ class UserPoint(models.Model):
 
     @staticmethod
     @sync_to_async
-    def get_users_that_need_leveling_info_updated(bucket_number):
+    def get_users_with_current_bucket_number(bucket_number):
         query = UserPoint.objects.all().filter(bucket_number=bucket_number).order_by('-points')
+        return list(query.values_list('user_id', flat=True))
+
+    @staticmethod
+    @sync_to_async
+    def get_users_with_expired_images():
+        query = UserPoint.objects.all().filter(
+            Q(discord_avatar_link_expiry_date__lte=pstdatetime.now()) &
+            Q(discord_avatar_link_expiry_date__isnull=False)  # adding this is in cause I don't know off the top of my head
+            # how sqlite3 and postgres handle null dates for the above conditional and I want to make absolutely sure
+            # users without expiry dates aren't retrieved
+        ).order_by('-points')
         return list(query.values_list('user_id', flat=True))
 
     def set_avatar_link_expiry_date(self, logger):
