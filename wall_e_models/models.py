@@ -379,11 +379,6 @@ class UserPoint(models.Model):
 
     @staticmethod
     @sync_to_async
-    def all_users_have_avatar_link_expiry_date():
-        return UserPoint.objects.all().filter(discord_avatar_link_expiry_date__isnull=True).count() == 0
-
-    @staticmethod
-    @sync_to_async
     def get_users_with_expired_images():
         query = UserPoint.objects.all().filter(
             Q(discord_avatar_link_expiry_date__lte=pstdatetime.now()) &
