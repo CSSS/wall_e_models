@@ -405,7 +405,7 @@ class UserPoint(models.Model):
             f"{self.discord_avatar_link_expiry_date}"
         )
 
-    async def update_leveling_profile_info(self, logger, member, levelling_website_avatar_channel,
+    async def update_leveling_profile_info(self, logger, guild_id, member, levelling_website_avatar_channel,
                                            updated_user_log_id=None):
         user_updated = False
         if not re.match(r"Deleted User \w*$", member.name):
@@ -440,6 +440,20 @@ class UserPoint(models.Model):
                                 f"[wall_e_models models.py update_leveling_profile_info()] "
                                 f"leveling_message_avatar_cdn_url = <{leveling_message_avatar_cdn_url}>"
                             )
+                            resp = requests.get(leveling_message_avatar_cdn_url)
+                            if resp.status_code != 200:
+                                message_link = (
+                                    f'https://discord.com/channels/{guild_id}/{levelling_website_avatar_channel.id}/'
+                                    f'{self.avatar_url_message_id}'
+                                )
+                                error_message = (
+                                    f"CDN link of {leveling_message_avatar_cdn_url} obtained from message "
+                                    f"{message_link} is not valid"
+                                )
+                                logger.error(
+                                    f"[wall_e_models models.py update_leveling_profile_info()] {error_message}"
+                                )
+                                raise Exception(error_message)
                             avatar_cdn_link_changed = self.leveling_message_avatar_url != leveling_message_avatar_cdn_url
                             logger.debug(
                                 f"[wall_e_models models.py update_leveling_profile_info()] avatar_cdn_link_changed = "
