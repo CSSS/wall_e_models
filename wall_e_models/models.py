@@ -408,7 +408,12 @@ class UserPoint(models.Model):
     async def update_leveling_profile_info(self, logger, guild_id, member, levelling_website_avatar_channel,
                                            updated_user_log_id=None):
         user_updated = False
-        if not re.match(r"Deleted User \w*$", member.name):
+        deleted_user = re.match(r"Deleted User \w*$", member.name)
+        logger.debug(
+            f"[wall_e_models models.py update_leveling_profile_info()] user {member.id} is "
+            f"{'' if deleted_user else 'not '}a deleted user"
+        )
+        if not deleted_user:
             file_name_friendly_member_name = member.name.replace("/", "").replace("\\", "")
             avatar_file_name = f'levelling-avatar-{file_name_friendly_member_name}-{time.time()}.png'.replace(" ", "-")
 
@@ -417,6 +422,11 @@ class UserPoint(models.Model):
             # also removing _ as _ followed by any special character can also break url rendering in discord
             try:
                 self.leveling_update_attempt += 1
+                if self.leveling_update_attempt > 1:
+                    logger.warning(
+                        f"[wall_e_models models.py update_leveling_profile_info()] increasing leveling_update_attempt"
+                        f" for {member} with id {member.id} to {self.leveling_update_attempt}"
+                    )
                 changes_detected = ""
 
                 member_display_avatar_url_changed = self.avatar_url != member.display_avatar.url
