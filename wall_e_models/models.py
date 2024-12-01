@@ -390,21 +390,33 @@ class UserPoint(models.Model):
         return [345853809735499786, 299000589155827712]
 
     def set_avatar_link_expiry_date(self, logger):
+        logger.debug(
+            f"[wall_e_models models.py set_avatar_link_expiry_date()] self.leveling_message_avatar_url = "
+            f"<{self.leveling_message_avatar_url}>"
+        )
         url = self.leveling_message_avatar_url
-        logger.debug(f"[wall_e_models models.py set_avatar_link_expiry_date()] url = <{url}>")
+        self.discord_avatar_link_expiry_date = UserPoint.get_avatar_link_expiry_date(logger, url)
+        logger.debug(
+            f"[wall_e_models models.py set_avatar_link_expiry_date()] discord_avatar_link_expiry_date = "
+            f"{self.discord_avatar_link_expiry_date}"
+        )
+
+    @staticmethod
+    def get_avatar_link_expiry_date(logger, url):
+        logger.debug(f"[wall_e_models models.py get_avatar_link_expiry_date()] url = <{url}>")
         query_params = {
             query_param[:query_param.find("=")]: query_param[query_param.find("=") + 1:]
             for query_param in url[url.index("?") + 1:].split("&")
             if query_param.find("=") != -1
         }
-        logger.debug(f"[wall_e_models models.py set_avatar_link_expiry_date()] query_params = {query_params}")
-        self.discord_avatar_link_expiry_date = pstdatetime.from_utc_datetime(
+        logger.debug(f"[wall_e_models models.py get_avatar_link_expiry_date()] query_params = {query_params}")
+        link_expiry_time = pstdatetime.from_utc_datetime(
             datetime.datetime.utcfromtimestamp(eval("0x" + query_params['ex'].strip()))
         )
-        logger.debug(
-            f"[wall_e_models models.py set_avatar_link_expiry_date()] discord_avatar_link_expiry_date = "
-            f"{self.discord_avatar_link_expiry_date}"
-        )
+        logger.debug(f"[wall_e_models models.py get_avatar_link_expiry_date()] link_expiry_time = {link_expiry_time}")
+        return link_expiry_time
+
+
 
     async def update_leveling_profile_info(self, logger, guild_id, member, levelling_website_avatar_channel,
                                            updated_user_log_id=None):
@@ -466,9 +478,15 @@ class UserPoint(models.Model):
                                 )
                                 raise Exception(error_message)
                             avatar_cdn_link_changed = self.leveling_message_avatar_url != leveling_message_avatar_cdn_url
+                            incorrect_timestamp = (
+                                    self.discord_avatar_link_expiry_date.pst.timestamp() !=
+                                    UserPoint.get_avatar_link_expiry_date(
+                                        logger, leveling_message_avatar_cdn_url
+                                    ).pst.timestamp()
+                            )
                             logger.debug(
                                 f"[wall_e_models models.py update_leveling_profile_info()] avatar_cdn_link_changed = "
-                                f"{avatar_cdn_link_changed}"
+                                f"{avatar_cdn_link_changed} || incorrect_timestamp = {incorrect_timestamp}"
                             )
                             attempt_avatar_link_retrieval = False
                         except discord.NotFound:
@@ -490,9 +508,10 @@ class UserPoint(models.Model):
                 logger.debug(
                     f"[wall_e_models models.py update_leveling_profile_info()] member_display_avatar_url_changed = "
                     f"{member_display_avatar_url_changed} && "
-                    f"avatar_cdn_link_changed = {avatar_cdn_link_changed}"
+                    f"avatar_cdn_link_changed = {avatar_cdn_link_changed} && incorrect_timestamp ="
+                    f" {incorrect_timestamp}"
                 )
-                if not member_display_avatar_url_changed and not avatar_cdn_link_changed:
+                if not member_display_avatar_url_changed and not avatar_cdn_link_changed and not incorrect_timestamp:
                     if pstdatetime.now() >= self.discord_avatar_link_expiry_date:
                         logger.debug(
                             f"[wall_e_models models.py update_leveling_profile_info()] {member}'s avatar CDN link has"
@@ -507,6 +526,9 @@ class UserPoint(models.Model):
                 elif avatar_cdn_link_changed:
                     number_of_changes += 1
                     changes_detected = 'avatar CDN link'
+                elif incorrect_timestamp:
+                    number_of_changes += 1
+                    changes_detected = 'timestamp on UserPoint'
 
                 if type(member) == discord.Member:  # necessary because if the user is no longer in the Guild,
                         # then they don't have a nickname on it
@@ -568,6 +590,8 @@ class UserPoint(models.Model):
                             pass
                     if avatar_cdn_link_changed:
                         self.leveling_message_avatar_url = leveling_message_avatar_cdn_url
+                        self.set_avatar_link_expiry_date(logger)
+                    if incorrect_timestamp:
                         self.set_avatar_link_expiry_date(logger)
                 if number_of_changes > 0:
                     logger.debug(
