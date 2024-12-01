@@ -445,6 +445,7 @@ class UserPoint(models.Model):
                 member_display_avatar_url_changed = self.avatar_url != member.display_avatar.url
                 avatar_cdn_link_changed = False
                 leveling_message_avatar_cdn_url = None
+                incorrect_timestamp = False
                 logger.debug(
                     f"[wall_e_models models.py update_leveling_profile_info()] member_display_avatar_url_changed = "
                     f"{member_display_avatar_url_changed}"
@@ -478,12 +479,13 @@ class UserPoint(models.Model):
                                 )
                                 raise Exception(error_message)
                             avatar_cdn_link_changed = self.leveling_message_avatar_url != leveling_message_avatar_cdn_url
-                            incorrect_timestamp = (
-                                    self.discord_avatar_link_expiry_date.pst.timestamp() !=
-                                    UserPoint.get_avatar_link_expiry_date(
-                                        logger, leveling_message_avatar_cdn_url
-                                    ).pst.timestamp()
-                            )
+                            if not avatar_cdn_link_changed:
+                                incorrect_timestamp = (
+                                        self.discord_avatar_link_expiry_date.pst.timestamp() !=
+                                        UserPoint.get_avatar_link_expiry_date(
+                                            logger, leveling_message_avatar_cdn_url
+                                        ).pst.timestamp()
+                                )
                             logger.debug(
                                 f"[wall_e_models models.py update_leveling_profile_info()] avatar_cdn_link_changed = "
                                 f"{avatar_cdn_link_changed} || incorrect_timestamp = {incorrect_timestamp}"
