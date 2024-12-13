@@ -382,9 +382,9 @@ class UserPoint(models.Model):
     def get_users_with_expired_images():
         query = UserPoint.objects.all().filter(
             Q(discord_avatar_link_expiry_date__lte=pstdatetime.now()) &
-            Q(discord_avatar_link_expiry_date__isnull=False)  # adding this is in cause I don't know off the top of my head
-            # how sqlite3 and postgres handle null dates for the above conditional and I want to make absolutely sure
-            # users without expiry dates aren't retrieved
+            Q(discord_avatar_link_expiry_date__isnull=False)  # adding this is in cause I don't know off the top
+            # of my head how sqlite3 and postgres handle null dates for the above conditional and I want to make
+            # absolutely sure users without expiry dates aren't retrieved
         ).order_by('-points')
         return list(query.values_list('user_id', flat=True))
         # return [345853809735499786, 299000589155827712]
@@ -428,7 +428,9 @@ class UserPoint(models.Model):
         )
         if not deleted_user:
             file_name_friendly_member_name = member.name.replace("/", "").replace("\\", "")
-            avatar_file_name = f'levelling-avatar-{file_name_friendly_member_name}-{time.time()}.png'.replace(" ", "-")
+            avatar_file_name = (
+                f'levelling-avatar-{file_name_friendly_member_name}-{time.time()}.png'.replace(" ", "-")
+            )
 
             avatar_file_name = avatar_file_name.replace(">", "").replace("_", "-")
             # removing > as just that alone can break url rendering in discord [for obvious reasons]
@@ -440,165 +442,33 @@ class UserPoint(models.Model):
                         f"[wall_e_models models.py update_leveling_profile_info()] increasing leveling_update_attempt"
                         f" for {member} with id {member.id} to {self.leveling_update_attempt}"
                     )
-                changes_detected = ""
-
-                member_display_avatar_url_changed = self.avatar_url != member.display_avatar.url
-                avatar_cdn_link_changed = False
-                leveling_message_avatar_cdn_url = None
-                incorrect_timestamp = False
-                logger.debug(
-                    f"[wall_e_models models.py update_leveling_profile_info()] member_display_avatar_url_changed = "
-                    f"{member_display_avatar_url_changed}"
+                (
+                    avatar_url_changed, changes_detected, leveling_message_avatar_url, avatar_message
+                ) = await self.get_latest_avatar_cdn(
+                    logger, member, levelling_website_avatar_channel, guild_id, avatar_file_name
                 )
-                if not member_display_avatar_url_changed:
-                    number_of_attempts = 0
-                    total_number_of_attempts = 5
-                    attempt_avatar_link_retrieval = True
-                    while number_of_attempts <= total_number_of_attempts and attempt_avatar_link_retrieval:
-                        number_of_attempts += 1
-                        try:
-                            leveling_message_avatar_cdn_url = (await levelling_website_avatar_channel.fetch_message(
-                                self.avatar_url_message_id
-                            )).attachments[0].url
-                            logger.debug(
-                                f"[wall_e_models models.py update_leveling_profile_info()] "
-                                f"leveling_message_avatar_cdn_url = <{leveling_message_avatar_cdn_url}>"
-                            )
-                            resp = requests.get(leveling_message_avatar_cdn_url)
-                            if resp.status_code != 200:
-                                message_link = (
-                                    f'https://discord.com/channels/{guild_id}/{levelling_website_avatar_channel.id}/'
-                                    f'{self.avatar_url_message_id}'
-                                )
-                                error_message = (
-                                    f"CDN link of {leveling_message_avatar_cdn_url} obtained from message "
-                                    f"{message_link} is not valid"
-                                )
-                                logger.error(
-                                    f"[wall_e_models models.py update_leveling_profile_info()] {error_message}"
-                                )
-                                raise Exception(error_message)
-                            avatar_cdn_link_changed = self.leveling_message_avatar_url != leveling_message_avatar_cdn_url
-                            if not avatar_cdn_link_changed:
-                                incorrect_timestamp = (
-                                        self.discord_avatar_link_expiry_date.pst.timestamp() !=
-                                        UserPoint.get_avatar_link_expiry_date(
-                                            logger, leveling_message_avatar_cdn_url
-                                        ).pst.timestamp()
-                                )
-                            logger.debug(
-                                f"[wall_e_models models.py update_leveling_profile_info()] avatar_cdn_link_changed = "
-                                f"{avatar_cdn_link_changed} || incorrect_timestamp = {incorrect_timestamp}"
-                            )
-                            attempt_avatar_link_retrieval = False
-                        except discord.NotFound:
-                            member_display_avatar_url_changed = True
-                            attempt_avatar_link_retrieval = False
-                        except Exception as e:
-                            if number_of_attempts == total_number_of_attempts:
-                                raise e
-                            waitTime = math.pow(2, number_of_attempts)
-                            logger.debug(
-                                f"[wall_e_models models.py update_leveling_profile_info()] sleeping for {waitTime}"
-                                f" seconds"
-                            )
-                            await asyncio.sleep(waitTime)
-                            logger.error(
-                                f"[wall_e_models models.py update_leveling_profile_info()] experienced error trying to "
-                                f"fetch the message with the avatar\n.{e}"
-                            )
-                logger.debug(
-                    f"[wall_e_models models.py update_leveling_profile_info()] member_display_avatar_url_changed = "
-                    f"{member_display_avatar_url_changed} && "
-                    f"avatar_cdn_link_changed = {avatar_cdn_link_changed} && incorrect_timestamp ="
-                    f" {incorrect_timestamp}"
-                )
-                if not member_display_avatar_url_changed and not avatar_cdn_link_changed and not incorrect_timestamp:
-                    if pstdatetime.now() >= self.discord_avatar_link_expiry_date:
-                        logger.debug(
-                            f"[wall_e_models models.py update_leveling_profile_info()] {member}'s avatar CDN link has"
-                            f" expired"
-                        )
-                        avatar_cdn_link_changed = True
+                number_of_changes = 1 if avatar_url_changed else 0
                 name_changed = self.name != member.name
-                number_of_changes = 0
-                if member_display_avatar_url_changed:
-                    number_of_changes += 1
-                    changes_detected = "avatar"
-                elif avatar_cdn_link_changed:
-                    number_of_changes += 1
-                    changes_detected = 'avatar CDN link'
-                elif incorrect_timestamp:
-                    number_of_changes += 1
-                    changes_detected = 'timestamp on UserPoint'
-
-                if type(member) == discord.Member:  # necessary because if the user is no longer in the Guild,
-                        # then they don't have a nickname on it
-                    if self.nickname != member.nick:
-                        number_of_changes += 1
-                        if changes_detected:
-                            changes_detected += ", " if name_changed else " and "
-                        changes_detected += "nickname"
-                else:
-                    if self.nickname is not None:
-                        number_of_changes += 1
-                        if changes_detected:
-                            changes_detected += ", " if name_changed else " and "
-                        changes_detected += "nickname"
                 if name_changed:
-                    if changes_detected:
-                        if number_of_changes == 2:
-                            changes_detected += ","
-                        changes_detected += " and "
-                    changes_detected += "name"
+                    if number_of_changes > 0:
+                        changes_detected += ", "
                     number_of_changes += 1
-
-                message = f"{member.name}\n<@{member.id}>"
-                if member_display_avatar_url_changed:
-                    if self.avatar_url_message_id is not None:
-                        try:
-                            avatar_msg = await levelling_website_avatar_channel.fetch_message(
-                                self.avatar_url_message_id
-                            )
-                            await avatar_msg.delete()
-                            logger.debug(
-                                f"[wall_e_models models.py update_leveling_profile_info()] deleted old avatar message"
-                                f" for member {member}"
-                            )
-                        except discord.NotFound:
-                            pass
-                    with open(avatar_file_name, "wb") as file:
-                        file.write(requests.get(member.display_avatar.url).content)
-                    avatar_msg = await levelling_website_avatar_channel.send(
-                        content=message, file=discord.File(avatar_file_name)
-                    )
-                    os.remove(avatar_file_name)
-                    self.avatar_url = member.display_avatar.url
-                    self.leveling_message_avatar_url = avatar_msg.attachments[0].url
-                    self.set_avatar_link_expiry_date(logger)
-                    self.avatar_url_message_id = avatar_msg.id
-                else:
-                    if name_changed and self.avatar_url_message_id is not None:
-                        try:
-                            avatar_msg = await levelling_website_avatar_channel.fetch_message(
-                                self.avatar_url_message_id
-                            )
-                            logger.debug(
-                                f"[wall_e_models models.py update_leveling_profile_info()] deleted old avatar message"
-                                f" for member {member}"
-                            )
-                            await avatar_msg.edit(content=message)
-                        except discord.NotFound:
-                            pass
-                    if avatar_cdn_link_changed:
-                        self.leveling_message_avatar_url = leveling_message_avatar_cdn_url
-                        self.set_avatar_link_expiry_date(logger)
-                    if incorrect_timestamp:
-                        self.set_avatar_link_expiry_date(logger)
+                    changes_detected += "name"
+                nickname_changed = type(member) == discord.Member and  self.nickname != member.nick
+                if nickname_changed:
+                    if number_of_changes > 0:
+                        changes_detected += " and "
+                    number_of_changes += 1
+                    changes_detected += "nickname"
                 if number_of_changes > 0:
+                    if avatar_url_changed:
+                        self.avatar_url = member.display_avatar.url
+                        self.leveling_message_avatar_url = leveling_message_avatar_url
+                        self.set_avatar_link_expiry_date(logger)
+                        self.avatar_url_message_id = avatar_message.id
                     logger.debug(
                         f"[wall_e_models models.py update_leveling_profile_info()] detected {changes_detected}"
-                        f" change for member {member}"
+                        f" change for member {member} with id [{member.id}]"
                     )
                     self.nickname = member.nick if type(member) == discord.Member else None
                     self.name = member.name
@@ -618,6 +488,134 @@ class UserPoint(models.Model):
                     os.remove(avatar_file_name)
                 raise Exception(e)
         return user_updated
+
+    async def get_latest_avatar_cdn(self, logger, member, levelling_website_avatar_channel,
+                                    guild_id, avatar_file_name):
+        """
+        :param logger:
+        :param member: the member object
+        :param levelling_website_avatar_channel: the discord.Message object pointing to the channel that hosts the
+         avatars
+        :param guild_id: the ID of the guild
+        :param avatar_file_name: the name to use for the avatar file
+        :return:
+        bool - True if something was changed
+        string - what was changed or empty string if nothing was changed
+        string - the latest avatar CDN link or None if nothing was changed
+        discord.Message - the discord message that contains the avatar or None if nothing was changed
+        """
+        if self.avatar_url is None:
+            avatar_message = await self.create_avatar_message(avatar_file_name, member, levelling_website_avatar_channel)
+            leveling_message_avatar_cdn_url = avatar_message.attachments[0].url
+            logger.debug(
+                f"[wall_e_models models.py get_latest_avatar_cdn()] "
+                f"created avatar message for new user with CDN link <{leveling_message_avatar_cdn_url}>"
+            )
+            return True, "avatar", leveling_message_avatar_cdn_url, avatar_message
+        user_has_changed_their_avatar = self.avatar_url != member.display_avatar.url
+        if user_has_changed_their_avatar:
+            await self.delete_avatar_message(levelling_website_avatar_channel)
+            logger.debug(
+                f"[wall_e_models models.py get_latest_avatar_cdn()] deleted old avatar message"
+                f" for member {member}"
+            )
+            avatar_message = await self.create_avatar_message(avatar_file_name, member, levelling_website_avatar_channel)
+            leveling_message_avatar_cdn_url = avatar_message.attachments[0].url
+            logger.debug(
+                f"[wall_e_models models.py get_latest_avatar_cdn()] "
+                f"user_has_changed_their_avatar = {user_has_changed_their_avatar} with CDN link"
+                f" <{leveling_message_avatar_cdn_url}>"
+            )
+            return True, "avatar", leveling_message_avatar_cdn_url, avatar_message
+        leveling_message_avatar_cdn_url = self.get_cdn_url(logger, levelling_website_avatar_channel, guild_id)
+        cdn_url_has_changed = self.leveling_message_avatar_url != leveling_message_avatar_cdn_url
+        if cdn_url_has_changed:
+            logger.debug(
+                f"[wall_e_models models.py get_latest_avatar_cdn()] "
+                f"user_has_changed_their_avatar = {user_has_changed_their_avatar} && "
+                f"cdn_url_has_changed = {cdn_url_has_changed} with CDN link <{leveling_message_avatar_cdn_url}>"
+            )
+            return True, "avatar CDN url changed", leveling_message_avatar_cdn_url, None
+        cdn_url_has_expired = pstdatetime.now().timestamp() >= self.discord_avatar_link_expiry_date.timestamp()
+        if cdn_url_has_changed:
+            leveling_message_avatar_cdn_url = self.get_cdn_url(logger, levelling_website_avatar_channel, guild_id)
+            if self.leveling_message_avatar_url != leveling_message_avatar_cdn_url:
+                logger.debug(
+                    f"[wall_e_models models.py get_latest_avatar_cdn()] "
+                    f"user_has_changed_their_avatar = {user_has_changed_their_avatar} && "
+                    f"cdn_url_has_changed = {cdn_url_has_changed} && cdn_url_has_expired = {cdn_url_has_expired}"
+                    f" with CDN link <{leveling_message_avatar_cdn_url}>"
+                )
+                return True, "avatar CDN url expired", leveling_message_avatar_cdn_url, None
+        return False, "", None, None
+
+    async def get_cdn_url(self, logger, levelling_website_avatar_channel, guild_id):
+        number_of_attempts = 0
+        total_number_of_attempts = 5
+        successful_avatar_link_retrieval = False
+        leveling_message_avatar_cdn_url = None
+        while number_of_attempts <= total_number_of_attempts and not successful_avatar_link_retrieval:
+            number_of_attempts += 1
+            try:
+                leveling_message_avatar_cdn_url = (await levelling_website_avatar_channel.fetch_message(
+                    self.avatar_url_message_id
+                )).attachments[0].url
+                resp = requests.get(leveling_message_avatar_cdn_url)
+                logger.debug(
+                    f"[wall_e_models models.py get_cdn_url()] "
+                    f"got a status_code of {resp.status_code} for leveling_message_avatar_cdn_url = "
+                    f"<{leveling_message_avatar_cdn_url}>"
+                )
+                if resp.status_code != 200:
+                    message_link = (
+                        f'https://discord.com/channels/{guild_id}/{levelling_website_avatar_channel.id}/'
+                        f'{self.avatar_url_message_id}'
+                    )
+                    error_message = (
+                        f"CDN link of <{leveling_message_avatar_cdn_url}> obtained from message "
+                        f"{message_link} is not valid and appears to be expired"
+                    )
+                    logger.error(
+                        f"[wall_e_models models.py get_cdn_url()] {error_message}"
+                    )
+                    raise Exception(error_message)
+                successful_avatar_link_retrieval = True
+            except discord.NotFound:
+                successful_avatar_link_retrieval = False
+            except Exception as e:
+                if number_of_attempts == total_number_of_attempts:
+                    raise e
+                waitTime = math.pow(2, number_of_attempts)
+                logger.debug(
+                    f"[wall_e_models models.py get_cdn_url()] sleeping for {waitTime}"
+                    f" seconds"
+                )
+                await asyncio.sleep(waitTime)
+                logger.error(
+                    f"[wall_e_models models.py get_cdn_url()] experienced error trying to "
+                    f"fetch the message with the avatar\n.{e}"
+                )
+        return leveling_message_avatar_cdn_url
+
+    async def create_avatar_message(self, avatar_file_name, member, levelling_website_avatar_channel):
+        with open(avatar_file_name, "wb") as file:
+            file.write(requests.get(member.display_avatar.url).content)
+        message = f"{member.name}\n<@{member.id}>"
+        avatar_msg = await levelling_website_avatar_channel.send(
+            content=message, file=discord.File(avatar_file_name)
+        )
+        os.remove(avatar_file_name)
+        return avatar_msg
+
+    async def delete_avatar_message(self, levelling_website_avatar_channel):
+        if self.avatar_url_message_id is not None:
+            try:
+                avatar_msg = await levelling_website_avatar_channel.fetch_message(
+                    self.avatar_url_message_id
+                )
+                await avatar_msg.delete()
+            except discord.NotFound:
+                pass
 
 
 class UpdatedUser(models.Model):
