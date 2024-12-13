@@ -395,11 +395,14 @@ class UserPoint(models.Model):
             f"<{self.leveling_message_avatar_url}>"
         )
         url = self.leveling_message_avatar_url
-        self.discord_avatar_link_expiry_date = UserPoint.get_avatar_link_expiry_date(logger, url)
-        logger.debug(
-            f"[wall_e_models models.py set_avatar_link_expiry_date()] discord_avatar_link_expiry_date = "
-            f"{self.discord_avatar_link_expiry_date}"
-        )
+        if type(url) == str:
+            self.discord_avatar_link_expiry_date = UserPoint.get_avatar_link_expiry_date(logger, url)
+            logger.debug(
+                f"[wall_e_models models.py set_avatar_link_expiry_date()] discord_avatar_link_expiry_date = "
+                f"{self.discord_avatar_link_expiry_date}"
+            )
+        else:
+            logger.error("fix the url for the user")
 
     @staticmethod
     def get_avatar_link_expiry_date(logger, url):
