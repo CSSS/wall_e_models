@@ -527,7 +527,7 @@ class UserPoint(models.Model):
                 f" <{leveling_message_avatar_cdn_url}>"
             )
             return True, "avatar", leveling_message_avatar_cdn_url, avatar_message
-        leveling_message_avatar_cdn_url = self.get_cdn_url(logger, levelling_website_avatar_channel, guild_id)
+        leveling_message_avatar_cdn_url = await self.get_cdn_url(logger, levelling_website_avatar_channel, guild_id)
         cdn_url_has_changed = self.leveling_message_avatar_url != leveling_message_avatar_cdn_url
         if cdn_url_has_changed:
             logger.debug(
@@ -538,7 +538,7 @@ class UserPoint(models.Model):
             return True, "avatar CDN url changed", leveling_message_avatar_cdn_url, None
         cdn_url_has_expired = pstdatetime.now().timestamp() >= self.discord_avatar_link_expiry_date.timestamp()
         if cdn_url_has_changed:
-            leveling_message_avatar_cdn_url = self.get_cdn_url(logger, levelling_website_avatar_channel, guild_id)
+            leveling_message_avatar_cdn_url = await self.get_cdn_url(logger, levelling_website_avatar_channel, guild_id)
             if self.leveling_message_avatar_url != leveling_message_avatar_cdn_url:
                 logger.debug(
                     f"[wall_e_models models.py get_latest_avatar_cdn()] "
