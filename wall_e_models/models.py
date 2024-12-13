@@ -446,7 +446,8 @@ class UserPoint(models.Model):
                         f" for {member} with id {member.id} to {self.leveling_update_attempt}"
                     )
                 (
-                    avatar_url_changed, changes_detected, leveling_message_avatar_url, avatar_message
+                    avatar_url_changed, changes_detected, display_avatar_url, leveling_message_avatar_url,
+                    avatar_message
                 ) = await self.get_latest_avatar_cdn(
                     logger, member, levelling_website_avatar_channel, guild_id, avatar_file_name
                 )
@@ -464,15 +465,16 @@ class UserPoint(models.Model):
                     number_of_changes += 1
                     changes_detected += "nickname"
                 if number_of_changes > 0:
-                    if avatar_url_changed:
-                        self.avatar_url = member.display_avatar.url
-                        self.leveling_message_avatar_url = leveling_message_avatar_url
-                        self.set_avatar_link_expiry_date(logger)
-                        self.avatar_url_message_id = avatar_message.id
                     logger.debug(
                         f"[wall_e_models models.py update_leveling_profile_info()] detected {changes_detected}"
                         f" change for member {member} with id [{member.id}]"
                     )
+                    if avatar_url_changed:
+                        self.avatar_url = display_avatar_url
+                        self.leveling_message_avatar_url = leveling_message_avatar_url
+                        self.set_avatar_link_expiry_date(logger)
+                        if avatar_message is not None:
+                            self.avatar_url_message_id = avatar_message.id
                     self.nickname = member.nick if type(member) == discord.Member else None
                     self.name = member.name
                     self.leveling_update_attempt = 0
@@ -504,9 +506,11 @@ class UserPoint(models.Model):
         :return:
         bool - True if something was changed
         string - what was changed or empty string if nothing was changed
+        string - the user's display avatar url
         string - the latest avatar CDN link or None if nothing was changed
         discord.Message - the discord message that contains the avatar or None if nothing was changed
         """
+        display_avatar_url = member.display_avatar.url
         if self.avatar_url is None:
             avatar_message = await self.create_avatar_message(avatar_file_name, member, levelling_website_avatar_channel)
             leveling_message_avatar_cdn_url = avatar_message.attachments[0].url
@@ -514,7 +518,7 @@ class UserPoint(models.Model):
                 f"[wall_e_models models.py get_latest_avatar_cdn()] "
                 f"created avatar message for new user with CDN link <{leveling_message_avatar_cdn_url}>"
             )
-            return True, "avatar", leveling_message_avatar_cdn_url, avatar_message
+            return True, "avatar", display_avatar_url, leveling_message_avatar_cdn_url, avatar_message
         user_has_changed_their_avatar = self.avatar_url != member.display_avatar.url
         if user_has_changed_their_avatar:
             await self.delete_avatar_message(levelling_website_avatar_channel)
@@ -529,7 +533,7 @@ class UserPoint(models.Model):
                 f"user_has_changed_their_avatar = {user_has_changed_their_avatar} with CDN link"
                 f" <{leveling_message_avatar_cdn_url}>"
             )
-            return True, "avatar", leveling_message_avatar_cdn_url, avatar_message
+            return True, "avatar", display_avatar_url, leveling_message_avatar_cdn_url, avatar_message
         leveling_message_avatar_cdn_url = await self.get_cdn_url(logger, levelling_website_avatar_channel, guild_id)
         cdn_url_has_changed = self.leveling_message_avatar_url != leveling_message_avatar_cdn_url
         if cdn_url_has_changed:
@@ -538,7 +542,7 @@ class UserPoint(models.Model):
                 f"user_has_changed_their_avatar = {user_has_changed_their_avatar} && "
                 f"cdn_url_has_changed = {cdn_url_has_changed} with CDN link <{leveling_message_avatar_cdn_url}>"
             )
-            return True, "avatar CDN url changed", leveling_message_avatar_cdn_url, None
+            return True, "avatar CDN url changed", display_avatar_url, leveling_message_avatar_cdn_url, None
         cdn_url_has_expired = pstdatetime.now().timestamp() >= self.discord_avatar_link_expiry_date.timestamp()
         if cdn_url_has_changed:
             leveling_message_avatar_cdn_url = await self.get_cdn_url(logger, levelling_website_avatar_channel, guild_id)
@@ -549,8 +553,8 @@ class UserPoint(models.Model):
                     f"cdn_url_has_changed = {cdn_url_has_changed} && cdn_url_has_expired = {cdn_url_has_expired}"
                     f" with CDN link <{leveling_message_avatar_cdn_url}>"
                 )
-                return True, "avatar CDN url expired", leveling_message_avatar_cdn_url, None
-        return False, "", None, None
+                return True, "avatar CDN url expired", display_avatar_url, leveling_message_avatar_cdn_url, None
+        return False, "", None, None, None
 
     async def get_cdn_url(self, logger, levelling_website_avatar_channel, guild_id):
         number_of_attempts = 0
