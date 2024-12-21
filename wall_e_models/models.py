@@ -582,7 +582,7 @@ class UserPoint(models.Model):
                         f"CDN link of <{leveling_message_avatar_cdn_url}> obtained from message "
                         f"{message_link} is not valid and appears to be expired"
                     )
-                    logger.error(
+                    logger.debug(
                         f"[wall_e_models models.py get_cdn_url()] {error_message}"
                     )
                     raise Exception(error_message)
@@ -590,6 +590,10 @@ class UserPoint(models.Model):
             except discord.NotFound:
                 successful_avatar_link_retrieval = False
             except Exception as e:
+                logger.debug(
+                    f"[wall_e_models models.py get_cdn_url()] experienced error trying to "
+                    f"fetch the message with the avatar\n.{e}"
+                )
                 if number_of_attempts == total_number_of_attempts:
                     raise e
                 waitTime = math.pow(2, number_of_attempts)
@@ -598,10 +602,7 @@ class UserPoint(models.Model):
                     f" seconds"
                 )
                 await asyncio.sleep(waitTime)
-                logger.error(
-                    f"[wall_e_models models.py get_cdn_url()] experienced error trying to "
-                    f"fetch the message with the avatar\n.{e}"
-                )
+
         return leveling_message_avatar_cdn_url
 
     async def create_avatar_message(self, avatar_file_name, member, levelling_website_avatar_channel):
