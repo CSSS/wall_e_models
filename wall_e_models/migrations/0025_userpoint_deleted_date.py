@@ -15,6 +15,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='userpoint',
             name='deleted_date',
-            field=wall_e_models.customFields.PSTDateTimeField(default=django.utils.timezone.now, null=True),
+            field=wall_e_models.customFields.PSTDateTimeField(default=None, null=True),
         ),
     ]
