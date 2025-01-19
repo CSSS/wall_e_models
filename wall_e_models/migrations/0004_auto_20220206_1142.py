@@ -14,8 +14,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='BanRecords',
             fields=[
-                ('ban_id', wall_e_models.customFields.GeneratedIdentityField(always=True, primary_key=True,
-                                                                           serialize=False)),
+                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('username', models.CharField(max_length=37)),
                 ('user_id', models.BigIntegerField()),
                 ('mod', models.CharField(max_length=37, null=True)),
