@@ -627,6 +627,12 @@ class UserPoint(models.Model):
             except discord.NotFound:
                 pass
 
+    @sync_to_async
+    def mark_user_as_updated(self, member_id):
+        user_point = UserPoint.objects.all().filter(user_id=member_id).first()
+        if user_point:
+            user_point.last_updated_date = pstdatetime.now().pst
+            user_point.save()
 
 class UpdatedUser(models.Model):
     user_point = models.ForeignKey(
