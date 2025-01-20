@@ -430,7 +430,7 @@ class UserPoint(models.Model):
             self.deleted_date = pstdatetime.now().pst
         if not deleted_user and self.deleted_date is not None:
             self.deleted_date = None
-        if member.id == 1150558250316615720:
+        if self.leveling_update_attempt == 5:
             logger.warning(
                 f"[wall_e_models models.py update_leveling_profile_info()] step 1"
                 f" for {member} with id {member.id} to {self.leveling_update_attempt} and deleted_user = {deleted_user}"
@@ -441,7 +441,7 @@ class UserPoint(models.Model):
         )
 
         avatar_file_name = avatar_file_name.replace(">", "").replace("_", "-")
-        if member.id == 1150558250316615720:
+        if self.leveling_update_attempt == 5:
             logger.warning(
                 f"[wall_e_models models.py update_leveling_profile_info()] step 2"
                 f" for {member} with id {member.id} to {self.leveling_update_attempt} and deleted_user = {deleted_user}"
@@ -455,12 +455,12 @@ class UserPoint(models.Model):
                     f"[wall_e_models models.py update_leveling_profile_info()] increasing leveling_update_attempt"
                     f" for {member} with id {member.id} to {self.leveling_update_attempt} and deleted_user = {deleted_user}"
                 )
-                if member.id == 1150558250316615720:
+                if self.leveling_update_attempt == 5:
                     logger.warning(
                         f"[wall_e_models models.py update_leveling_profile_info()] step 3"
                         f" for {member} with id {member.id} to {self.leveling_update_attempt} and deleted_user = {deleted_user}"
                     )
-            if member.id == 1150558250316615720:
+            if self.leveling_update_attempt == 5:
                 logger.warning(
                     f"[wall_e_models models.py update_leveling_profile_info()] step 4"
                     f" for {member} with id {member.id} to {self.leveling_update_attempt} and deleted_user = {deleted_user}"
@@ -471,14 +471,14 @@ class UserPoint(models.Model):
             ) = await self.get_latest_avatar_cdn(
                 logger, member, levelling_website_avatar_channel, guild_id, avatar_file_name
             )
-            if member.id == 1150558250316615720:
+            if self.leveling_update_attempt == 5:
                 logger.warning(
                     f"[wall_e_models models.py update_leveling_profile_info()] step 5"
                     f" for {member} with id {member.id} to {self.leveling_update_attempt} and deleted_user = {deleted_user}"
                 )
             number_of_changes = 1 if avatar_url_changed else 0
             if not deleted_user:
-                if member.id == 1150558250316615720:
+                if self.leveling_update_attempt == 5:
                     logger.warning(
                         f"[wall_e_models models.py update_leveling_profile_info()] step 6"
                         f" for {member} with id {member.id} to {self.leveling_update_attempt} and deleted_user = {deleted_user}"
@@ -496,7 +496,7 @@ class UserPoint(models.Model):
                     number_of_changes += 1
                     changes_detected += "nickname"
             if number_of_changes > 0:
-                if member.id == 1150558250316615720:
+                if self.leveling_update_attempt == 5:
                     logger.warning(
                         f"[wall_e_models models.py update_leveling_profile_info()] step 7"
                         f" for {member} with id {member.id} to {self.leveling_update_attempt} and deleted_user = {deleted_user}"
@@ -506,7 +506,7 @@ class UserPoint(models.Model):
                     f" change for member {member} with id [{member.id}] and deleted_user = {deleted_user}"
                 )
                 if avatar_url_changed:
-                    if member.id == 1150558250316615720:
+                    if self.leveling_update_attempt == 5:
                         logger.warning(
                             f"[wall_e_models models.py update_leveling_profile_info()] step 8"
                             f" for {member} with id {member.id} to {self.leveling_update_attempt} and deleted_user = {deleted_user}"
@@ -516,45 +516,45 @@ class UserPoint(models.Model):
                     self.set_avatar_link_expiry_date(logger)
                     if avatar_message is not None:
                         self.avatar_url_message_id = avatar_message.id
-                    if member.id == 1150558250316615720:
+                    if self.leveling_update_attempt == 5:
                         logger.warning(
                             f"[wall_e_models models.py update_leveling_profile_info()] step 9"
                             f" for {member} with id {member.id} to {self.leveling_update_attempt} and deleted_user = {deleted_user}"
                         )
                 if not deleted_user:
-                    if member.id == 1150558250316615720:
+                    if self.leveling_update_attempt == 5:
                         logger.warning(
                             f"[wall_e_models models.py update_leveling_profile_info()] step 10"
                             f" for {member} with id {member.id} to {self.leveling_update_attempt} and deleted_user = {deleted_user}"
                         )
                     self.nickname = member.nick if type(member) == discord.Member else None
                     self.name = member.name
-                    if member.id == 1150558250316615720:
+                    if self.leveling_update_attempt == 5:
                         logger.warning(
                             f"[wall_e_models models.py update_leveling_profile_info()] step 11"
                             f" for {member} with id {member.id} to {self.leveling_update_attempt} and deleted_user = {deleted_user}"
                         )
                 self.leveling_update_attempt = 0
                 user_updated = True
-                if member.id == 1150558250316615720:
+                if self.leveling_update_attempt == 5:
                     logger.warning(
                         f"[wall_e_models models.py update_leveling_profile_info()] step 12"
                         f" for {member} with id {member.id} to {self.leveling_update_attempt} and deleted_user = {deleted_user}"
                     )
                 await self.async_save()
-                if member.id == 1150558250316615720:
+                if self.leveling_update_attempt == 5:
                     logger.warning(
                         f"[wall_e_models models.py update_leveling_profile_info()] step 13"
                         f" for {member} with id {member.id} to {self.leveling_update_attempt} and deleted_user = {deleted_user}"
                     )
             if updated_user_log_id is not None:
-                if member.id == 1150558250316615720:
+                if self.leveling_update_attempt == 5:
                     logger.warning(
                         f"[wall_e_models models.py update_leveling_profile_info()] step 14"
                         f" for {member} with id {member.id} to {self.leveling_update_attempt} and deleted_user = {deleted_user}"
                     )
                 await UpdatedUser.async_delete(updated_user_log_id)
-                if member.id == 1150558250316615720:
+                if self.leveling_update_attempt == 5:
                     logger.warning(
                         f"[wall_e_models models.py update_leveling_profile_info()] step 15"
                         f" for {member} with id {member.id} to {self.leveling_update_attempt} and deleted_user = {deleted_user}"
