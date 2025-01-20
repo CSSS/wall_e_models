@@ -107,12 +107,12 @@ class BanRecord(models.Model):
     @classmethod
     @sync_to_async
     def marked_user_as_purged(cls, record_id):
-        record_obj = BanRecord.objects.get(ban_id=record_id)
+        record_obj = BanRecord.objects.get(id=record_id)
         record_obj.is_purged = True
         record_obj.save()
 
     def __str__(self) -> str:
-        return f"ban_id=[{self.ban_id}] username=[{self.username}] user_id=[{self.user_id}] " \
+        return f"id=[{self.id}] username=[{self.username}] user_id=[{self.user_id}] " \
                f"mod=[{self.mod}] mod_id=[{self.mod_id}] date=[{self.ban_date}] reason=[{self.reason}]" \
                f"unban_date=[{self.unban_date}]"
 
