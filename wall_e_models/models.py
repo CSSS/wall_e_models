@@ -425,7 +425,7 @@ class UserPoint(models.Model):
     async def update_leveling_profile_info(self, logger, guild_id, member, levelling_website_avatar_channel,
                                            updated_user_log_id=None):
         user_updated = False
-        deleted_user = re.match(r"deleted_user_\w*$", member.name)
+        deleted_user = re.match(r"deleted_user_\w*$", member.name) is not None
         if deleted_user and self.deleted_date is None:
             self.deleted_date = pstdatetime.now().pst
         if not deleted_user and self.deleted_date is not None:
