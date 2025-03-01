@@ -299,6 +299,10 @@ class UserPoint(models.Model):
 
     last_updated_date = PSTDateTimeField(default=None, null=True)
 
+    being_processed = models.BooleanField(
+        default=False
+    )
+
     @sync_to_async
     def async_save(self):
         self.save()
@@ -381,6 +385,14 @@ class UserPoint(models.Model):
 
     @staticmethod
     @sync_to_async
+    def reset_attempts_and_process_status():
+        user_points = UserPoint.objects.all()
+        user_points.update(being_processed=False)
+        user_points.update(leveling_update_attempt=0)
+        UserPoint.objects.bulk_update(user_points, ['being_processed', 'leveling_update_attempt'])
+
+    @staticmethod
+    @sync_to_async
     def load_to_cache():
         return {user_point.user_id: user_point for user_point in UserPoint.objects.all().order_by('-points')}
 
@@ -436,15 +448,18 @@ class UserPoint(models.Model):
     async def update_leveling_profile_info(self, logger, guild_id, member, levelling_website_avatar_channel,
                                            updated_user_log_id=None):
         user_updated = False
+        user_processed = False
+        log_prefix = (
+            f"[wall_e_models models.py update_leveling_profile_info()] process attempt {self.leveling_update_attempt}"
+            f" to get data for user with UpdatedUser id [{updated_user_log_id}] with id {member.id} for member"
+            f" {member}: "
+        )
         deleted_user = re.match(r"deleted_user_\w*$", member.name) is not None
         if deleted_user and self.deleted_date is None:
             self.deleted_date = pstdatetime.now().pst
         if not deleted_user and self.deleted_date is not None:
             self.deleted_date = None
-        logger.debug(
-            f"[wall_e_models models.py update_leveling_profile_info()] processing {member} with id {member.id} with "
-            f"leveling_update_attempt = {self.leveling_update_attempt} and deleted_user = {deleted_user}"
-        )
+        logger.debug(f"{log_prefix}  deleted_user = {deleted_user}")
         file_name_friendly_member_name = member.name.replace("/", "").replace("\\", "")
         avatar_file_name = (
             f'levelling-avatar-{file_name_friendly_member_name}-{time.time()}.png'.replace(" ", "-")
@@ -454,12 +469,6 @@ class UserPoint(models.Model):
         # removing > as just that alone can break url rendering in discord [for obvious reasons]
         # also removing _ as _ followed by any special character can also break url rendering in discord
         try:
-            self.leveling_update_attempt += 1
-            if self.leveling_update_attempt > 1:
-                logger.warning(
-                    f"[wall_e_models models.py update_leveling_profile_info()] increasing leveling_update_attempt"
-                    f" for {member} with id {member.id} to {self.leveling_update_attempt} and deleted_user = {deleted_user}"
-                )
             (
                 avatar_url_changed, changes_detected, display_avatar_url, leveling_message_avatar_url,
                 avatar_message
@@ -467,6 +476,10 @@ class UserPoint(models.Model):
                 logger, member, levelling_website_avatar_channel, guild_id, avatar_file_name
             )
             number_of_changes = 1 if avatar_url_changed else 0
+            logger.debug(
+                f"{log_prefix} number of changes after getting latest avatar CDN is {number_of_changes} as avatar url"
+                f" changed is {avatar_url_changed}"
+            )
             if not deleted_user:
                 name_changed = self.name != member.name
                 if name_changed:
@@ -480,6 +493,9 @@ class UserPoint(models.Model):
                         changes_detected += " and "
                     number_of_changes += 1
                     changes_detected += "nickname"
+            logger.debug(
+                f"{log_prefix} number of changes after processing non-profile pic changes is {number_of_changes}"
+            )
             if number_of_changes > 0:
                 logger.debug(
                     f"[wall_e_models models.py update_leveling_profile_info()] detected {changes_detected}"
@@ -494,11 +510,15 @@ class UserPoint(models.Model):
                 if not deleted_user:
                     self.nickname = member.nick if type(member) == discord.Member else None
                     self.name = member.name
-                self.leveling_update_attempt = 0
                 user_updated = True
-                await self.async_save()
             if updated_user_log_id is not None:
+                logger.debug(
+                    f"{log_prefix} attempting deletion of UpdatedUser record for id {updated_user_log_id}"
+                )
                 await UpdatedUser.async_delete(updated_user_log_id)
+            self.leveling_update_attempt = 0
+            await self.async_save()
+            user_processed = True
         except Exception as e:
             logger.error(
                 "[wall_e_models models.py update_leveling_profile_info()] experienced following error when "
@@ -509,7 +529,7 @@ class UserPoint(models.Model):
             if os.path.exists(avatar_file_name):
                 os.remove(avatar_file_name)
             raise Exception(e)
-        return user_updated
+        return user_updated, user_processed
 
     async def get_latest_avatar_cdn(self, logger, member, levelling_website_avatar_channel,
                                     guild_id, avatar_file_name):
