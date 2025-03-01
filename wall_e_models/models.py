@@ -549,6 +549,9 @@ class UserPoint(models.Model):
         """
         display_avatar_url = member.display_avatar.url
         if self.avatar_url is None:
+            logger.debug(
+                f"[wall_e_models models.py get_latest_avatar_cdn()] creating fresh avatar message for user [{member}]"
+            )
             avatar_message = await self.create_avatar_message(logger, avatar_file_name, member, levelling_website_avatar_channel)
             if avatar_message:
                 leveling_message_avatar_cdn_url = avatar_message.attachments[0].url
@@ -561,16 +564,19 @@ class UserPoint(models.Model):
                 return False, "", None, None, None
         user_has_changed_their_avatar = self.avatar_url != member.display_avatar.url
         if user_has_changed_their_avatar:
-            await self.delete_avatar_message(levelling_website_avatar_channel)
             logger.debug(
-                f"[wall_e_models models.py get_latest_avatar_cdn()] deleted old avatar message"
-                f" for member {member}"
+                f"[wall_e_models models.py get_latest_avatar_cdn()] user [{member}] has changed their avatar"
             )
             avatar_message = await self.create_avatar_message(logger, avatar_file_name, member, levelling_website_avatar_channel)
             # not putting an else statement since if the user's new avatar is too big for the discord file upload API,
             # the least that wall_e can do is just continue to get the latest CDN for the old profile pic until such
             # time as the user uploads a new profile pic that is not too big for the file upload API
             if avatar_message:
+                await self.delete_avatar_message(levelling_website_avatar_channel)
+                logger.debug(
+                    f"[wall_e_models models.py get_latest_avatar_cdn()] deleted old avatar message"
+                    f" for member {member}"
+                )
                 leveling_message_avatar_cdn_url = avatar_message.attachments[0].url
                 logger.debug(
                     f"[wall_e_models models.py get_latest_avatar_cdn()] "
