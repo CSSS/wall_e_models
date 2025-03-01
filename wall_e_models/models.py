@@ -430,6 +430,10 @@ class UserPoint(models.Model):
             self.deleted_date = pstdatetime.now().pst
         if not deleted_user and self.deleted_date is not None:
             self.deleted_date = None
+        logger.debug(
+            f"[wall_e_models models.py update_leveling_profile_info()] processing {member} with id {member.id} with "
+            f"leveling_update_attempt = {self.leveling_update_attempt} and deleted_user = {deleted_user}"
+        )
         file_name_friendly_member_name = member.name.replace("/", "").replace("\\", "")
         avatar_file_name = (
             f'levelling-avatar-{file_name_friendly_member_name}-{time.time()}.png'.replace(" ", "-")
@@ -443,7 +447,7 @@ class UserPoint(models.Model):
             if self.leveling_update_attempt > 1:
                 logger.warning(
                     f"[wall_e_models models.py update_leveling_profile_info()] increasing leveling_update_attempt"
-                    f" for {member} with id {member.id} to {self.leveling_update_attempt}"
+                    f" for {member} with id {member.id} to {self.leveling_update_attempt} and deleted_user = {deleted_user}"
                 )
             (
                 avatar_url_changed, changes_detected, display_avatar_url, leveling_message_avatar_url,
@@ -468,7 +472,7 @@ class UserPoint(models.Model):
             if number_of_changes > 0:
                 logger.debug(
                     f"[wall_e_models models.py update_leveling_profile_info()] detected {changes_detected}"
-                    f" change for member {member} with id [{member.id}]"
+                    f" change for member {member} with id [{member.id}] and deleted_user = {deleted_user}"
                 )
                 if avatar_url_changed:
                     self.avatar_url = display_avatar_url
