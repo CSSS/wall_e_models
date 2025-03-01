@@ -385,11 +385,13 @@ class UserPoint(models.Model):
 
     @staticmethod
     @sync_to_async
-    def reset_attempts_and_process_status():
+    def reset_attempts_and_process_status(logger):
+        logger.debug("[Leveling reset_attempts_and_process_status()] starting")
         user_points = UserPoint.objects.all()
         user_points.update(being_processed=False)
         user_points.update(leveling_update_attempt=0)
         UserPoint.objects.bulk_update(user_points, ['being_processed', 'leveling_update_attempt'])
+        logger.debug("[Leveling reset_attempts_and_process_status()] finished")
 
     @staticmethod
     @sync_to_async
