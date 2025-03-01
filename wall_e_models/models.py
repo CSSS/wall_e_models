@@ -15,6 +15,7 @@ import discord
 import pytz
 from asgiref.sync import sync_to_async
 from dateutil.tz import tz
+from discord import HTTPException
 from django.conf import settings
 from django.db import models
 from django.db.models import Q, UniqueConstraint, F
@@ -528,13 +529,16 @@ class UserPoint(models.Model):
         """
         display_avatar_url = member.display_avatar.url
         if self.avatar_url is None:
-            avatar_message = await self.create_avatar_message(avatar_file_name, member, levelling_website_avatar_channel)
-            leveling_message_avatar_cdn_url = avatar_message.attachments[0].url
-            logger.debug(
-                f"[wall_e_models models.py get_latest_avatar_cdn()] "
-                f"created avatar message for new user with CDN link <{leveling_message_avatar_cdn_url}>"
-            )
-            return True, "avatar", display_avatar_url, leveling_message_avatar_cdn_url, avatar_message
+            avatar_message = await self.create_avatar_message(logger, avatar_file_name, member, levelling_website_avatar_channel)
+            if avatar_message:
+                leveling_message_avatar_cdn_url = avatar_message.attachments[0].url
+                logger.debug(
+                    f"[wall_e_models models.py get_latest_avatar_cdn()] "
+                    f"created avatar message for new user with CDN link <{leveling_message_avatar_cdn_url}>"
+                )
+                return True, "avatar", display_avatar_url, leveling_message_avatar_cdn_url, avatar_message
+            else:
+                return False, "", None, None, None
         user_has_changed_their_avatar = self.avatar_url != member.display_avatar.url
         if user_has_changed_their_avatar:
             await self.delete_avatar_message(levelling_website_avatar_channel)
@@ -542,14 +546,17 @@ class UserPoint(models.Model):
                 f"[wall_e_models models.py get_latest_avatar_cdn()] deleted old avatar message"
                 f" for member {member}"
             )
-            avatar_message = await self.create_avatar_message(avatar_file_name, member, levelling_website_avatar_channel)
-            leveling_message_avatar_cdn_url = avatar_message.attachments[0].url
-            logger.debug(
-                f"[wall_e_models models.py get_latest_avatar_cdn()] "
-                f"user_has_changed_their_avatar = {user_has_changed_their_avatar} with CDN link"
-                f" <{leveling_message_avatar_cdn_url}>"
-            )
-            return True, "avatar", display_avatar_url, leveling_message_avatar_cdn_url, avatar_message
+            avatar_message = await self.create_avatar_message(logger, avatar_file_name, member, levelling_website_avatar_channel)
+            if avatar_message:
+                leveling_message_avatar_cdn_url = avatar_message.attachments[0].url
+                logger.debug(
+                    f"[wall_e_models models.py get_latest_avatar_cdn()] "
+                    f"user_has_changed_their_avatar = {user_has_changed_their_avatar} with CDN link"
+                    f" <{leveling_message_avatar_cdn_url}>"
+                )
+                return True, "avatar", display_avatar_url, leveling_message_avatar_cdn_url, avatar_message
+            else:
+                return False, "", None, None, None
         leveling_message_avatar_cdn_url = await self.get_cdn_url(logger, levelling_website_avatar_channel, guild_id)
         cdn_url_has_changed = self.leveling_message_avatar_url != leveling_message_avatar_cdn_url
         if cdn_url_has_changed:
@@ -621,13 +628,20 @@ class UserPoint(models.Model):
 
         return leveling_message_avatar_cdn_url
 
-    async def create_avatar_message(self, avatar_file_name, member, levelling_website_avatar_channel):
+    async def create_avatar_message(self, logger, avatar_file_name, member, levelling_website_avatar_channel):
         with open(avatar_file_name, "wb") as file:
             file.write(requests.get(member.display_avatar.url).content)
         message = f"{member.name}\n<@{member.id}>"
-        avatar_msg = await levelling_website_avatar_channel.send(
-            content=message, file=discord.File(avatar_file_name)
-        )
+        avatar_msg = None
+        try:
+            avatar_msg = await levelling_website_avatar_channel.send(
+                content=message, file=discord.File(avatar_file_name)
+            )
+        except HTTPException as e:
+            logger.warn(
+                f"[wall_e_models models.py create_avatar_message()] experienced error trying to upload user's profile"
+                f" image to discord:\n{e}"
+            )
         os.remove(avatar_file_name)
         return avatar_msg
 
