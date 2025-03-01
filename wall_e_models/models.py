@@ -267,6 +267,16 @@ class UserPoint(models.Model):
     hidden = models.BooleanField(
         default=False
     )
+
+    # this is a way to make sure that if a certain user can't be retrieved after 5 attempts, that the code no longer
+    # tries that user.
+    # HOWEVER, there is a small bug with this in an edge case: *if* for whatever reason, there is backlog of entries
+    # under the UpdatedUser table, there is likely more than 1 entry for the same user and since they will all get
+    # processed in quick succession, this means that _update_member_profile_data will wind up processing a bunch of
+    # function calls that will report a member as having no changes and therefore bump ups the leveling_update_attempt.
+    # Trying to figure out a way to solve this seems overly convulsed and this just seems to be a technical limitation
+    # of the architecture for WALL_E. So if this happens, I just suggest manually updating the database entries for any
+    # entries with a leveling_update_attempt >= 5 to 0 and restarting WALL_E
     leveling_update_attempt = models.IntegerField(
         default=0,
         null=False
