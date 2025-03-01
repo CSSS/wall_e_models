@@ -567,6 +567,9 @@ class UserPoint(models.Model):
                 f" for member {member}"
             )
             avatar_message = await self.create_avatar_message(logger, avatar_file_name, member, levelling_website_avatar_channel)
+            # not putting an else statement since if the user's new avatar is too big for the discord file upload API,
+            # the least that wall_e can do is just continue to get the latest CDN for the old profile pic until such
+            # time as the user uploads a new profile pic that is not too big for the file upload API
             if avatar_message:
                 leveling_message_avatar_cdn_url = avatar_message.attachments[0].url
                 logger.debug(
@@ -575,8 +578,6 @@ class UserPoint(models.Model):
                     f" <{leveling_message_avatar_cdn_url}>"
                 )
                 return True, "avatar", display_avatar_url, leveling_message_avatar_cdn_url, avatar_message
-            else:
-                return False, "", None, None, None
         leveling_message_avatar_cdn_url = await self.get_cdn_url(logger, levelling_website_avatar_channel, guild_id)
         cdn_url_has_changed = self.leveling_message_avatar_url != leveling_message_avatar_cdn_url
         if cdn_url_has_changed:
