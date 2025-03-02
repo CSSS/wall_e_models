@@ -293,7 +293,7 @@ class UserPoint(models.Model):
         null=True
     )
 
-    discord_avatar_link_expiry_date = PSTDateTimeField(default=timezone.now, null=True)
+    discord_avatar_link_expiry_date = PSTDateTimeField(default=pstdatetime.now, null=True)
 
     deleted_date = PSTDateTimeField(default=None, null=True)
 
