@@ -650,7 +650,8 @@ class UserPoint(models.Model):
                 successful_avatar_link_retrieval = False
                 logger.debug(
                     f"[wall_e_models models.py get_cdn_url()] not able to find avatar message for member with id"
-                    f" {member_id} on attempt {number_of_attempts}/{total_number_of_attempts}"
+                    f" {member_id} in channel {levelling_website_avatar_channel.id} with message id"
+                    f" {self.avatar_url_message_id} on attempt {number_of_attempts}/{total_number_of_attempts}"
                 )
             except Exception as e:
                 logger.debug(
