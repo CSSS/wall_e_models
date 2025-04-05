@@ -687,8 +687,8 @@ class UserPoint(models.Model):
             )
         except HTTPException as e:
             logger.warn(
-                f"[wall_e_models models.py create_avatar_message()] experienced error trying to upload user's profile"
-                f" image to discord:\n{e}"
+                f"[wall_e_models models.py create_avatar_message()] experienced error trying to upload user {member}"
+                f" with id {member.id}'s profile image to discord:\n{e}"
             )
         os.remove(avatar_file_name)
         return avatar_msg
