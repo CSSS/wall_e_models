@@ -586,7 +586,7 @@ class UserPoint(models.Model):
                     f" <{leveling_message_avatar_cdn_url}>"
                 )
                 return True, "avatar", display_avatar_url, leveling_message_avatar_cdn_url, avatar_message
-        leveling_message_avatar_cdn_url = await self.get_cdn_url(logger, levelling_website_avatar_channel, guild_id, member, avatar_file_name)
+        leveling_message_avatar_cdn_url = await self.get_cdn_url(logger, levelling_website_avatar_channel, guild_id, member)
         if leveling_message_avatar_cdn_url:
             cdn_url_has_changed = self.leveling_message_avatar_url != leveling_message_avatar_cdn_url
             if cdn_url_has_changed:
@@ -598,7 +598,7 @@ class UserPoint(models.Model):
                 return True, "avatar CDN url changed", display_avatar_url, leveling_message_avatar_cdn_url, None
             cdn_url_has_expired = pstdatetime.now().timestamp() >= self.discord_avatar_link_expiry_date.timestamp()
             if cdn_url_has_changed:
-                leveling_message_avatar_cdn_url = await self.get_cdn_url(logger, levelling_website_avatar_channel, guild_id, member, avatar_file_name)
+                leveling_message_avatar_cdn_url = await self.get_cdn_url(logger, levelling_website_avatar_channel, guild_id, member)
                 if leveling_message_avatar_cdn_url:
                     if self.leveling_message_avatar_url != leveling_message_avatar_cdn_url:
                         logger.debug(
@@ -610,7 +610,7 @@ class UserPoint(models.Model):
                         return True, "avatar CDN url expired", display_avatar_url, leveling_message_avatar_cdn_url, None
         return False, "", None, None, None
 
-    async def get_cdn_url(self, logger, levelling_website_avatar_channel, guild_id, member, avatar_file_name):
+    async def get_cdn_url(self, logger, levelling_website_avatar_channel, guild_id, member):
         number_of_attempts = 0
         total_number_of_attempts = 5
         successful_avatar_link_retrieval = False
