@@ -639,7 +639,7 @@ class UserPoint(models.Model):
                 if resp.status_code != 200:
                     error_message = (
                         f"CDN link of <{leveling_message_avatar_cdn_url}> obtained from message "
-                        f"{message_link} is not valid and appears to be expired"
+                        f"<{message_link}> is not valid and appears to be expired"
                     )
                     logger.debug(
                         f"[wall_e_models models.py get_cdn_url()] {error_message}"
@@ -647,19 +647,12 @@ class UserPoint(models.Model):
                     raise Exception(error_message)
                 successful_avatar_link_retrieval = True
             except discord.NotFound:
-                logger.debug(
-                    f"[wall_e_models models.py get_cdn_url()] not able to find avatar message {message_link} for "
+                logger.error(
+                    f"[wall_e_models models.py get_cdn_url()] not able to find avatar message <{message_link}> for "
                     f"member with id {member.id} on attempt {number_of_attempts}/{total_number_of_attempts}"
                 )
-                avatar_message = await self.create_avatar_message(logger, avatar_file_name, member,
-                                                                  levelling_website_avatar_channel)
-                if avatar_message:
-                    leveling_message_avatar_cdn_url = avatar_message.attachments[0].url
-                    logger.debug(
-                        f"[wall_e_models models.py get_cdn_url()] "
-                        f"created avatar message for new user with CDN link <{leveling_message_avatar_cdn_url}>"
-                    )
-                    successful_avatar_link_retrieval = True
+                # if the comes here, a dev needs to manually wipe the avatar_url, avatar_url_message_id and
+                # discord_avatar_link_expiry_date for the user in the db
             except Exception as e:
                 logger.debug(
                     f"[wall_e_models models.py get_cdn_url()] experienced error trying to "
