@@ -586,7 +586,7 @@ class UserPoint(models.Model):
                     f" <{leveling_message_avatar_cdn_url}>"
                 )
                 return True, "avatar", display_avatar_url, leveling_message_avatar_cdn_url, avatar_message
-        leveling_message_avatar_cdn_url = await self.get_cdn_url(logger, levelling_website_avatar_channel, guild_id, member.id)
+        leveling_message_avatar_cdn_url = await self.get_cdn_url(logger, levelling_website_avatar_channel, guild_id, member, avatar_file_name)
         if leveling_message_avatar_cdn_url:
             cdn_url_has_changed = self.leveling_message_avatar_url != leveling_message_avatar_cdn_url
             if cdn_url_has_changed:
@@ -598,7 +598,7 @@ class UserPoint(models.Model):
                 return True, "avatar CDN url changed", display_avatar_url, leveling_message_avatar_cdn_url, None
             cdn_url_has_expired = pstdatetime.now().timestamp() >= self.discord_avatar_link_expiry_date.timestamp()
             if cdn_url_has_changed:
-                leveling_message_avatar_cdn_url = await self.get_cdn_url(logger, levelling_website_avatar_channel, guild_id, member.id)
+                leveling_message_avatar_cdn_url = await self.get_cdn_url(logger, levelling_website_avatar_channel, guild_id, member, avatar_file_name)
                 if leveling_message_avatar_cdn_url:
                     if self.leveling_message_avatar_url != leveling_message_avatar_cdn_url:
                         logger.debug(
@@ -610,7 +610,7 @@ class UserPoint(models.Model):
                         return True, "avatar CDN url expired", display_avatar_url, leveling_message_avatar_cdn_url, None
         return False, "", None, None, None
 
-    async def get_cdn_url(self, logger, levelling_website_avatar_channel, guild_id, member_id):
+    async def get_cdn_url(self, logger, levelling_website_avatar_channel, guild_id, member, avatar_file_name):
         number_of_attempts = 0
         total_number_of_attempts = 5
         successful_avatar_link_retrieval = False
@@ -619,9 +619,13 @@ class UserPoint(models.Model):
             logger.debug(
                 f"[wall_e_models models.py get_cdn_url()] "
                 f"atttempt {number_of_attempts}/{total_number_of_attempts} to get CDN link for member with id"
-                f" {member_id}"
+                f" {member.id}"
             )
             number_of_attempts += 1
+            message_link = (
+                f'https://discord.com/channels/{guild_id}/{levelling_website_avatar_channel.id}/'
+                f'{self.avatar_url_message_id}'
+            )
             try:
                 leveling_message_avatar_cdn_url = (await levelling_website_avatar_channel.fetch_message(
                     self.avatar_url_message_id
@@ -633,10 +637,6 @@ class UserPoint(models.Model):
                     f"<{leveling_message_avatar_cdn_url}>"
                 )
                 if resp.status_code != 200:
-                    message_link = (
-                        f'https://discord.com/channels/{guild_id}/{levelling_website_avatar_channel.id}/'
-                        f'{self.avatar_url_message_id}'
-                    )
                     error_message = (
                         f"CDN link of <{leveling_message_avatar_cdn_url}> obtained from message "
                         f"{message_link} is not valid and appears to be expired"
@@ -647,12 +647,19 @@ class UserPoint(models.Model):
                     raise Exception(error_message)
                 successful_avatar_link_retrieval = True
             except discord.NotFound:
-                successful_avatar_link_retrieval = False
                 logger.debug(
-                    f"[wall_e_models models.py get_cdn_url()] not able to find avatar message for member with id"
-                    f" {member_id} in channel {levelling_website_avatar_channel.id} with message id"
-                    f" {self.avatar_url_message_id} on attempt {number_of_attempts}/{total_number_of_attempts}"
+                    f"[wall_e_models models.py get_cdn_url()] not able to find avatar message {message_link} for "
+                    f"member with id {member.id} on attempt {number_of_attempts}/{total_number_of_attempts}"
                 )
+                avatar_message = await self.create_avatar_message(logger, avatar_file_name, member,
+                                                                  levelling_website_avatar_channel)
+                if avatar_message:
+                    leveling_message_avatar_cdn_url = avatar_message.attachments[0].url
+                    logger.debug(
+                        f"[wall_e_models models.py get_cdn_url()] "
+                        f"created avatar message for new user with CDN link <{leveling_message_avatar_cdn_url}>"
+                    )
+                    successful_avatar_link_retrieval = True
             except Exception as e:
                 logger.debug(
                     f"[wall_e_models models.py get_cdn_url()] experienced error trying to "
