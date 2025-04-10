@@ -303,6 +303,10 @@ class UserPoint(models.Model):
         default=False
     )
 
+    outsized_profile_pic = models.BooleanField(
+        default=False
+    )
+
     @sync_to_async
     def async_save(self):
         self.save()
@@ -409,6 +413,7 @@ class UserPoint(models.Model):
     def get_users_with_expired_images():
         query = UserPoint.objects.all().filter(
             Q(discord_avatar_link_expiry_date__lte=pstdatetime.now()) &
+            Q(outsized_profile_pic=False) &
             Q(discord_avatar_link_expiry_date__isnull=False)  # adding this is in cause I don't know off the top
             # of my head how sqlite3 and postgres handle null dates for the above conditional and I want to make
             # absolutely sure users without expiry dates aren't retrieved
@@ -473,7 +478,7 @@ class UserPoint(models.Model):
         try:
             (
                 avatar_url_changed, changes_detected, display_avatar_url, leveling_message_avatar_url,
-                avatar_message
+                avatar_message, oversized_pic
             ) = await self.get_latest_avatar_cdn(
                 logger, member, levelling_website_avatar_channel, guild_id, avatar_file_name
             )
@@ -519,6 +524,7 @@ class UserPoint(models.Model):
                 )
                 await UpdatedUser.async_delete(updated_user_log_id)
             self.leveling_update_attempt = 0
+            self.outsized_profile_pic = oversized_pic
             await self.async_save()
             user_processed = True
         except Exception as e:
@@ -550,29 +556,27 @@ class UserPoint(models.Model):
         discord.Message - the discord message that contains the avatar or None if nothing was changed
         """
         display_avatar_url = member.display_avatar.url
+        oversized_pic = False
         if self.avatar_url is None:
             logger.debug(
                 f"[wall_e_models models.py get_latest_avatar_cdn()] creating fresh avatar message for user [{member}]"
             )
-            avatar_message = await self.create_avatar_message(logger, avatar_file_name, member, levelling_website_avatar_channel)
+            avatar_message, oversized_pic = await self.create_avatar_message(logger, avatar_file_name, member, levelling_website_avatar_channel)
             if avatar_message:
                 leveling_message_avatar_cdn_url = avatar_message.attachments[0].url
                 logger.debug(
                     f"[wall_e_models models.py get_latest_avatar_cdn()] "
                     f"created avatar message for new user with CDN link <{leveling_message_avatar_cdn_url}>"
                 )
-                return True, "avatar", display_avatar_url, leveling_message_avatar_cdn_url, avatar_message
+                return True, "avatar", display_avatar_url, leveling_message_avatar_cdn_url, avatar_message, oversized_pic
             else:
-                return False, "", None, None, None
+                return False, "", None, None, None, oversized_pic
         user_has_changed_their_avatar = self.avatar_url != member.display_avatar.url
         if user_has_changed_their_avatar:
             logger.debug(
                 f"[wall_e_models models.py get_latest_avatar_cdn()] user [{member}] has changed their avatar"
             )
-            avatar_message = await self.create_avatar_message(logger, avatar_file_name, member, levelling_website_avatar_channel)
-            # not putting an else statement since if the user's new avatar is too big for the discord file upload API,
-            # the least that wall_e can do is just continue to get the latest CDN for the old profile pic until such
-            # time as the user uploads a new profile pic that is not too big for the file upload API
+            avatar_message, oversized_pic = await self.create_avatar_message(logger, avatar_file_name, member, levelling_website_avatar_channel)
             if avatar_message:
                 await self.delete_avatar_message(levelling_website_avatar_channel)
                 logger.debug(
@@ -585,7 +589,9 @@ class UserPoint(models.Model):
                     f"user_has_changed_their_avatar = {user_has_changed_their_avatar} with CDN link"
                     f" <{leveling_message_avatar_cdn_url}>"
                 )
-                return True, "avatar", display_avatar_url, leveling_message_avatar_cdn_url, avatar_message
+                return True, "avatar", display_avatar_url, leveling_message_avatar_cdn_url, avatar_message, oversized_pic
+            else:
+                return False, "", None, None, None, oversized_pic
         leveling_message_avatar_cdn_url = await self.get_cdn_url(logger, levelling_website_avatar_channel, guild_id, member)
         if leveling_message_avatar_cdn_url:
             cdn_url_has_changed = self.leveling_message_avatar_url != leveling_message_avatar_cdn_url
@@ -595,7 +601,7 @@ class UserPoint(models.Model):
                     f"user_has_changed_their_avatar = {user_has_changed_their_avatar} && "
                     f"cdn_url_has_changed = {cdn_url_has_changed} with CDN link <{leveling_message_avatar_cdn_url}>"
                 )
-                return True, "avatar CDN url changed", display_avatar_url, leveling_message_avatar_cdn_url, None
+                return True, "avatar CDN url changed", display_avatar_url, leveling_message_avatar_cdn_url, None, oversized_pic
             cdn_url_has_expired = pstdatetime.now().timestamp() >= self.discord_avatar_link_expiry_date.timestamp()
             if cdn_url_has_changed:
                 leveling_message_avatar_cdn_url = await self.get_cdn_url(logger, levelling_website_avatar_channel, guild_id, member)
@@ -607,8 +613,8 @@ class UserPoint(models.Model):
                             f"cdn_url_has_changed = {cdn_url_has_changed} && cdn_url_has_expired = {cdn_url_has_expired}"
                             f" with CDN link <{leveling_message_avatar_cdn_url}>"
                         )
-                        return True, "avatar CDN url expired", display_avatar_url, leveling_message_avatar_cdn_url, None
-        return False, "", None, None, None
+                        return True, "avatar CDN url expired", display_avatar_url, leveling_message_avatar_cdn_url, None, oversized_pic
+        return False, "", None, None, None, oversized_pic
 
     async def get_cdn_url(self, logger, levelling_website_avatar_channel, guild_id, member):
         number_of_attempts = 0
@@ -674,6 +680,7 @@ class UserPoint(models.Model):
             file.write(requests.get(member.display_avatar.url).content)
         message = f"{member.name}\n<@{member.id}>"
         avatar_msg = None
+        oversized_pic = False
         try:
             avatar_msg = await levelling_website_avatar_channel.send(
                 content=message, file=discord.File(avatar_file_name)
@@ -683,8 +690,9 @@ class UserPoint(models.Model):
                 f"[wall_e_models models.py create_avatar_message()] experienced error trying to upload user {member}"
                 f" with id {member.id}'s profile image to discord:\n{e}"
             )
+            oversized_pic = True
         os.remove(avatar_file_name)
-        return avatar_msg
+        return avatar_msg, oversized_pic
 
     async def delete_avatar_message(self, levelling_website_avatar_channel):
         if self.avatar_url_message_id is not None:
