@@ -483,25 +483,19 @@ class UserPoint(models.Model):
                 leveling_message_avatar_cdn_url = await self.get_cdn_url(logger, levelling_website_avatar_channel, guild_id, member)
                 cdn_url_has_changed = self.leveling_message_avatar_url != leveling_message_avatar_cdn_url
                 cdn_url_has_expired = pstdatetime.now().timestamp() >= self.discord_avatar_link_expiry_date.timestamp()
-                logger.debug(
+                newer_cdn_url_detected = leveling_message_avatar_cdn_url and cdn_url_has_changed
+                logger.debug(e
                     f"[wall_e_models models.py update_leveling_profile_info()] user_has_changed_their_avatar = False "
-                    f"&& cdn_url_has_changed = {cdn_url_has_changed} && cdn_url_has_expired = {cdn_url_has_expired}"
+                    f"&& cdn_url_has_changed = {cdn_url_has_changed} && newer_cdn_url_detected = "
+                    f"{newer_cdn_url_detected} && cdn_url_has_expired = {cdn_url_has_expired}"
                     f" with CDN link <{leveling_message_avatar_cdn_url}>"
                 )
-                if leveling_message_avatar_cdn_url and cdn_url_has_changed:
-                    avatar_url_changed = True
-                    changes_detected ="avatar CDN url expired"
-                    display_avatar_url = member.display_avatar.url
-                    leveling_message_avatar_url = leveling_message_avatar_cdn_url
-                    avatar_message = None
-                    oversized_pic = False
-                else:
-                    avatar_url_changed = False
-                    changes_detected =""
-                    display_avatar_url = None
-                    leveling_message_avatar_url = None
-                    avatar_message = None
-                    oversized_pic = False
+                avatar_url_changed = True if newer_cdn_url_detected  else False
+                changes_detected = "avatar CDN url expired" if newer_cdn_url_detected else ''
+                display_avatar_url = member.display_avatar.url if newer_cdn_url_detected else None
+                leveling_message_avatar_url = leveling_message_avatar_cdn_url if newer_cdn_url_detected else None
+                avatar_message = None
+                oversized_pic = False
             else:
                 (
                     avatar_url_changed, changes_detected, display_avatar_url, leveling_message_avatar_url,
