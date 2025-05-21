@@ -484,7 +484,7 @@ class UserPoint(models.Model):
                 cdn_url_has_changed = self.leveling_message_avatar_url != leveling_message_avatar_cdn_url
                 cdn_url_has_expired = pstdatetime.now().timestamp() >= self.discord_avatar_link_expiry_date.timestamp()
                 newer_cdn_url_detected = leveling_message_avatar_cdn_url and cdn_url_has_changed
-                logger.debug(e
+                logger.debug(
                     f"[wall_e_models models.py update_leveling_profile_info()] user_has_changed_their_avatar = False "
                     f"&& cdn_url_has_changed = {cdn_url_has_changed} && newer_cdn_url_detected = "
                     f"{newer_cdn_url_detected} && cdn_url_has_expired = {cdn_url_has_expired}"
