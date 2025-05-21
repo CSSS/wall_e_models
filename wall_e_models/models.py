@@ -479,7 +479,6 @@ class UserPoint(models.Model):
         # also removing _ as _ followed by any special character can also break url rendering in discord
         try:
             if user_newly_deleted or (deleted_user and not user_newly_deleted):
-                user_updated = True
                 leveling_message_avatar_cdn_url = await self.get_cdn_url(logger, levelling_website_avatar_channel, guild_id, member)
                 cdn_url_has_changed = self.leveling_message_avatar_url != leveling_message_avatar_cdn_url
                 cdn_url_has_expired = pstdatetime.now().timestamp() >= self.discord_avatar_link_expiry_date.timestamp()
@@ -490,6 +489,7 @@ class UserPoint(models.Model):
                     f"{newer_cdn_url_detected} && cdn_url_has_expired = {cdn_url_has_expired}"
                     f" with CDN link <{leveling_message_avatar_cdn_url}>"
                 )
+                user_updated = newer_cdn_url_detected
                 avatar_url_changed = True if newer_cdn_url_detected  else False
                 changes_detected = "avatar CDN url expired" if newer_cdn_url_detected else ''
                 display_avatar_url = member.display_avatar.url if newer_cdn_url_detected else None
