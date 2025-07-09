@@ -46,6 +46,12 @@ class ReactRole(models.Model):
 
     @classmethod
     @sync_to_async
+    def update_react_role(cls, react_role: ReactRole) -> None:
+        """Updates ReactRole entry"""
+        react_role.save()
+
+    @classmethod
+    @sync_to_async
     def get_all_react_roles(cls) -> List[ReactRole]:
         """Returns list of all ReactRoles"""
         return list(ReactRole.objects.all())
