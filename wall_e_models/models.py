@@ -289,6 +289,15 @@ class UserPoint(models.Model):
         default=False
     )
 
+    # since being_processed relies on an assumption that wall_e has a certain level of atomicity, which just isn't
+    # possible without going deep into django model transactions [which I don't really have time for], the best way I
+    # can come up with for the bot being able to recover from a user stuck in a "processed" state is to just keep
+    # track of how many times an update was attempted and then assuming the recorded processed state is incorrect
+    # and needs to be overridden
+    concurrent_attempts = models.BigIntegerField(
+        default=0
+    )
+
     outsized_profile_pic = models.BooleanField(
         default=False
     )
@@ -378,9 +387,13 @@ class UserPoint(models.Model):
     def reset_attempts_and_process_status(logger):
         logger.debug("[Leveling reset_attempts_and_process_status()] starting")
         user_points = UserPoint.objects.all()
+        user_points.update(concurrent_attempts=0)
         user_points.update(being_processed=False)
         user_points.update(leveling_update_attempt=0)
-        UserPoint.objects.bulk_update(user_points, ['being_processed', 'leveling_update_attempt'])
+        UserPoint.objects.bulk_update(
+            user_points,
+            ['concurrent_attempts', 'being_processed', 'leveling_update_attempt']
+        )
         logger.debug("[Leveling reset_attempts_and_process_status()] finished")
 
     @staticmethod
