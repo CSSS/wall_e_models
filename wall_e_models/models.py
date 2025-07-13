@@ -29,6 +29,60 @@ from .customFields import pstdatetime, PSTDateTimeField  # noqa: E402
 import requests  # noqa: E402
 
 
+class ReactRole(models.Model):
+    react_role_id = models.BigAutoField(primary_key=True)
+    channel_id = models.BigIntegerField(null=False)
+    message_id = models.BigIntegerField(null=False, unique=True)
+    emoji_roles_json = models.TextField(null=False)
+
+    class Meta:
+        db_table = 'wall_e_models_react_roles'
+
+    @classmethod
+    @sync_to_async
+    def insert_react_role(cls, react_role: ReactRole) -> None:
+        """Adds entry to ReactRole table"""
+        react_role.save()
+
+    @classmethod
+    @sync_to_async
+    def update_react_role(cls, react_role: ReactRole) -> None:
+        """Updates ReactRole entry"""
+        react_role.save()
+
+    @classmethod
+    @sync_to_async
+    def get_all_react_roles(cls) -> List[ReactRole]:
+        """Returns list of all ReactRoles"""
+        return list(ReactRole.objects.all())
+
+    @classmethod
+    @sync_to_async
+    def get_all_message_ids_emoji_roles(cls) -> List[ReactRole]:
+        """Returns list of ReactRole with message_id and emoji_roles_json """
+        return list(ReactRole.objects.values('message_id', 'emoji_roles_json'))
+
+    @classmethod
+    @sync_to_async
+    def get_react_role_by_message_id(cls, message_id) -> ReactRole:
+        try:
+            return ReactRole.objects.get(message_id=message_id)
+        except Exception:
+            return None
+
+    @classmethod
+    @sync_to_async
+    def get_channel_id_by_message_id(cls, message_id) -> int:
+        return ReactRole.objects.get(message_id=message_id).channel_id
+
+    def __str__(self):
+        return (
+            f'react_role_id = {self.react_role_id}, '
+            f'channel_id = {self.channel_id}, '
+            f'message_id = {self.message_id}, '
+            f'emoji_roles_json = {self.emoji_roles_json}'
+        )
+
 class BanRecord(models.Model):
     username = models.CharField(max_length=37, null=False)
     user_id = models.BigIntegerField(null=False)
