@@ -343,6 +343,15 @@ class UserPoint(models.Model):
         default=False
     )
 
+    # since being_processed relies on an assumption that wall_e has a certain level of atomicity, which just isn't
+    # possible without going deep into django model transactions [which I don't really have time for], the best way I
+    # can come up with for the bot being able to recover from a user stuck in a "processed" state is to just keep
+    # track of how many times an update was attempted and then assuming the recorded processed state is incorrect
+    # and needs to be overridden
+    concurrent_attempts = models.BigIntegerField(
+        default=0
+    )
+
     outsized_profile_pic = models.BooleanField(
         default=False
     )
@@ -431,10 +440,27 @@ class UserPoint(models.Model):
     @sync_to_async
     def reset_attempts_and_process_status(logger):
         logger.debug("[Leveling reset_attempts_and_process_status()] starting")
-        user_points = UserPoint.objects.all()
-        user_points.update(being_processed=False)
-        user_points.update(leveling_update_attempt=0)
-        UserPoint.objects.bulk_update(user_points, ['being_processed', 'leveling_update_attempt'])
+        all_user_points = UserPoint.objects.all()
+        user_point_ids_to_update = all_user_points.values_list('user_id', flat=True)
+        number_of_users_to_update = len(user_point_ids_to_update)
+        max_number_of_user_to_update_at_once = 1000
+        start_index = 0
+        while start_index <  number_of_users_to_update:
+            end_index = start_index + max_number_of_user_to_update_at_once
+            logger.debug(
+                f"[Leveling reset_attempts_and_process_status()] attempting to update users from index "
+                f"{start_index} to {end_index}"
+            )
+            user_ids_to_update = user_point_ids_to_update[start_index:end_index]
+            user_to_update = all_user_points.filter(user_id__in=user_ids_to_update)
+            user_to_update.update(concurrent_attempts=0)
+            user_to_update.update(being_processed=False)
+            user_to_update.update(leveling_update_attempt=0)
+            UserPoint.objects.bulk_update(
+                user_to_update,
+                ['concurrent_attempts', 'being_processed', 'leveling_update_attempt']
+            )
+            start_index = end_index
         logger.debug("[Leveling reset_attempts_and_process_status()] finished")
 
     @staticmethod
