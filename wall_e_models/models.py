@@ -75,6 +75,14 @@ class ReactRole(models.Model):
     def get_channel_id_by_message_id(cls, message_id) -> int:
         return ReactRole.objects.get(message_id=message_id).channel_id
 
+    @classmethod
+    @sync_to_async
+    def delete_react_role_by_message_id(cls, message_id) -> None:
+        try:
+            ReactRole.objects.get(message_id=message_id).delete()
+        except Exception:
+            pass
+
     def __str__(self):
         return (
             f'react_role_id = {self.react_role_id}, '
